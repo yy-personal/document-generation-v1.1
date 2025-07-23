@@ -1,0 +1,16 @@
+Task:
+
+-We will focus on creating phase 2 'Function 1: PDF Processing Service' first.
+-We have completed 'Function 1: PDF Processing Service', now working on 'PowerPoint Generation Service'
+
+-I would prefer to build on the knowledge on how we did it at Phase 1(you may refer to our Github knowledge, using Semantic Kernel and my .env.example.txt info my Open AI Foundry settings)
+
+-There will be a backend of Azure Function that we are focusing on, with a very simple conversational Frontend for me to call the Azure Function API easier without having the need of constantly test my functions through POSTMAN. The Frontend should be developed in React 18. We will prioritize backend first, before working on the simple frontend.
+
+-My PDF Function should optimally take in either PDF, Word Document file, then output as PDF, PPT, Word according to function. While user still can converse with my Agent about the topic.
+
+-Distinguish between Agent/Skill while creating the Agents.
+
+-Ideally should follow the structure of 'azure_functions' that we have at Phase 1, but cleaner and less repeated codes.
+
+-In the end, we will have 3 'azure_functions'
