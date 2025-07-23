@@ -49,10 +49,18 @@ class PowerPointBuilderAgent(BaseAgent):
     def _parse_slide_content(self, slide_content: str) -> list:
         """Parse slide content into structured data"""
         try:
+            # Clean up potential markdown formatting around JSON
+            if '```json' in slide_content:
+                slide_content = slide_content.split('```json')[1].split('```')[0]
+
             if slide_content.strip().startswith(('[', '{')):
                 content_data = json.loads(slide_content)
-                return content_data if isinstance(content_data, list) else content_data.get('slides', [])
-        except json.JSONDecodeError:
+                # Handle cases where the JSON is a dict with a 'slides' key
+                if isinstance(content_data, dict):
+                    return content_data.get('slides') or content_data.get('presentation_structure', [])
+                return content_data
+        except (json.JSONDecodeError, IndexError):
+            # Fallback to markdown if JSON parsing fails
             pass
         
         return self._parse_markdown_content(slide_content)
@@ -96,9 +104,21 @@ class PowerPointBuilderAgent(BaseAgent):
         """Create individual slide with simple formatting"""
         layout = slide_info.get("layout", "CONTENT_SLIDE")
         title = slide_info.get("title", "Slide Title")
-        content = slide_info.get("content", [])
         
-        slide_layout = prs.slide_layouts[0] if layout == "TITLE_SLIDE" else prs.slide_layouts[1]
+        ### --- FIX START --- ###
+        # This is the critical change.
+        # It looks for the "content" key first (from the SlideContentGenerator).
+        # If that's not found (e.g., because the generation step failed),
+        # it falls back to the "content_outline" key from the PresentationStructureAgent.
+        # This prevents slides from being created with no text content.
+        content = slide_info.get("content") or slide_info.get("content_outline", [])
+        ### --- FIX END --- ###
+        
+        # Determine the slide layout based on type or position
+        slide_layout_index = 0 if layout == "TITLE_SLIDE" or not prs.slides else 1
+        if slide_layout_index >= len(prs.slide_layouts):
+            slide_layout_index = 5 # A common 'blank with content' layout as a fallback
+        slide_layout = prs.slide_layouts[slide_layout_index]
         slide = prs.slides.add_slide(slide_layout)
         
         # Format title
@@ -113,7 +133,10 @@ class PowerPointBuilderAgent(BaseAgent):
                 text_frame = content_placeholder.text_frame
                 text_frame.clear()
                 
-                for i, item in enumerate(content[:6]):  # Max 6 items
+                # Make sure content is a list
+                content_list = content if isinstance(content, list) else [content]
+                
+                for i, item in enumerate(content_list[:6]):  # Max 6 items
                     p = text_frame.paragraphs[0] if i == 0 else text_frame.add_paragraph()
                     p.text = str(item)
                     self._apply_content_format(p)
@@ -131,6 +154,7 @@ class PowerPointBuilderAgent(BaseAgent):
 
     def _apply_content_format(self, paragraph):
         """Apply content formatting"""
+        paragraph.level = 0
         for run in paragraph.runs:
             font = run.font
             font.name = 'Calibri'
