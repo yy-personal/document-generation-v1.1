@@ -1,5 +1,5 @@
 """
-PowerPoint Generation Orchestrator - Consolidated pipeline with 4 AI calls
+PowerPoint Generation Orchestrator - Fixed conversation context handling
 """
 import json
 import uuid
@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Any, Tuple
 from config import *
 
 class PowerPointOrchestrator:
-    """Orchestrator for PowerPoint generation with consolidated AI pipeline"""
+    """Orchestrator for PowerPoint generation with fixed context handling"""
 
     def __init__(self):
         self.agent_instances = {}
@@ -56,19 +56,26 @@ class PowerPointOrchestrator:
         return None, None
 
     def _is_continuation_request(self, user_message: str, conversation: List[dict]) -> bool:
-        """Check if user message is a continuation request referring to a previous document"""
+        """Enhanced continuation request detection"""
         continuation_keywords = [
             "create", "generate", "make", "build", "produce", "presentation",
-            "slides", "powerpoint", "ppt", "show", "present",
+            "slides", "powerpoint", "ppt", "show", "present", "convert",
+            "transform", "turn into", "export", "output",
             "the document", "this document", "the file", "this file",
-            "it", "this", "that"
+            "it", "this", "that", "from this", "based on"
         ]
         
         user_lower = user_message.lower()
         has_continuation_keywords = any(keyword in user_lower for keyword in continuation_keywords)
         has_previous_document = self._extract_document_from_conversation_history(conversation)[0] is not None
         
-        return has_continuation_keywords and has_previous_document
+        # Additional check: if user message is short and has action words, likely continuation
+        is_short_action_request = (
+            len(user_message.split()) <= 10 and 
+            any(action in user_lower for action in ["create", "make", "generate", "show", "convert"])
+        )
+        
+        return (has_continuation_keywords or is_short_action_request) and has_previous_document
 
     def _get_agent(self, agent_name: str):
         """Get or create agent instance using lazy loading"""
@@ -133,13 +140,11 @@ class PowerPointOrchestrator:
 
     def _create_presentation_fallback(self, user_input: str, document_content: str) -> Dict[str, Any]:
         """Create intelligent fallback for presentation analysis"""
-        user_lower = user_input.lower()
-        
         return {
             "intent": "CREATE_PRESENTATION",
             "confidence": 0.6,
             "reasoning": "Fallback analysis - generating standard business presentation",
-            "target_slides": 12,
+            "estimated_slides": 12,
             "fallback_used": True
         }
 
@@ -257,6 +262,8 @@ Upload a document and I'll create a professional presentation automatically."""
                     
                     if document_content:
                         print(f"Found previous {file_type} document in conversation history")
+                    else:
+                        print("No previous document found in conversation history")
 
             if document_content:
                 # POWERPOINT GENERATION PIPELINE
@@ -291,7 +298,8 @@ Upload a document and I'll create a professional presentation automatically."""
                                               processing_info={
                                                   "intent": analysis_result,
                                                   "file_type": file_type,
-                                                  "response_type": "capabilities_info"
+                                                  "response_type": "capabilities_info",
+                                                  "context_source": "previous_conversation" if has_previous_document else "current_message"
                                               },
                                               pipeline_info=pipeline_info)
                 
@@ -314,7 +322,11 @@ Upload a document and I'll create a professional presentation automatically."""
                     ppt_base64 = base64.b64encode(ppt_bytes).decode('utf-8')
                     
                     # Build response message
-                    response_text = f"I've created a professional business presentation from your {file_type.upper()} document. "
+                    if has_previous_document:
+                        response_text = f"I've created a presentation from the {file_type.upper()} document as requested. "
+                    else:
+                        response_text = f"I've created a professional business presentation from your {file_type.upper()} document. "
+                    
                     response_text += f"The presentation contains {max_slides} slides with company branding and clean formatting."
                     
                     conversation.append({"role": "assistant", "content": response_text})
@@ -328,7 +340,8 @@ Upload a document and I'll create a professional presentation automatically."""
                                                   "max_slides": max_slides,
                                                   "estimated_slides": estimated_slides,
                                                   "file_type": file_type,
-                                                  "response_type": "powerpoint_generation"
+                                                  "response_type": "powerpoint_generation",
+                                                  "context_source": "previous_conversation" if has_previous_document else "current_message"
                                               },
                                               pipeline_info=pipeline_info,
                                               powerpoint_output={
@@ -346,7 +359,8 @@ Upload a document and I'll create a professional presentation automatically."""
                                               processing_info={
                                                   "intent": analysis_result,
                                                   "file_type": file_type,
-                                                  "response_type": "clarification_request"
+                                                  "response_type": "clarification_request",
+                                                  "context_source": "previous_conversation" if has_previous_document else "current_message"
                                               })
             
             else:
