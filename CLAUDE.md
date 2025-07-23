@@ -93,7 +93,8 @@ Both services use Semantic Kernel with specialized agents:
 ### Input
 - PDF documents (via base64)
 - Word documents (.docx, via base64)
-- Format: `[pdf_extraction]base64_content` or `[word_document_extraction]base64_content`
+- Format: `[document]base64_content` (simplified tag)
+- Legacy formats still supported: `[pdf_extraction]base64_content` or `[word_document_extraction]base64_content`
 
 ### Output
 - PDF service: Base64 PDF reports + text responses

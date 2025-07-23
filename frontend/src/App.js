@@ -49,9 +49,8 @@ function App() {
       // Convert file to base64
       const base64Data = await fileToBase64(file);
       
-      // Build user message with base64 content
-      const fileTypeTag = file.type.includes('pdf') ? 'pdf_extraction' : 'word_document_extraction';
-      const fullMessage = `${userMessage}[${fileTypeTag}]${base64Data}`;
+      // Build user message with base64 content using simplified tag
+      const fullMessage = `${userMessage}[document]${base64Data}`;
 
       // Generate PowerPoint
       const pptResponse = await fetch(API_CONFIG.PPT_GENERATION_API, {
