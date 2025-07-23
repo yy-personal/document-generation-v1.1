@@ -1,5 +1,5 @@
 """
-PowerPoint Generation Orchestrator - Fixed conversation context handling
+PowerPoint Generation Orchestrator - Refactored architecture
 """
 import json
 import uuid
@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Any, Tuple
 from config import *
 
 class PowerPointOrchestrator:
-    """Orchestrator for PowerPoint generation with fixed context handling"""
+    """Orchestrator with refactored agent architecture"""
 
     def __init__(self):
         self.agent_instances = {}
@@ -60,19 +60,18 @@ class PowerPointOrchestrator:
         continuation_keywords = [
             "create", "generate", "make", "build", "produce", "presentation",
             "slides", "powerpoint", "ppt", "show", "present", "convert",
-            "transform", "turn into", "export", "output",
+            "transform", "turn into", "export", "output", "proceed",
             "the document", "this document", "the file", "this file",
-            "it", "this", "that", "from this", "based on", "proceed"
+            "it", "this", "that", "from this", "based on"
         ]
         
         user_lower = user_message.lower()
         has_continuation_keywords = any(keyword in user_lower for keyword in continuation_keywords)
         has_previous_document = self._extract_document_from_conversation_history(conversation)[0] is not None
         
-        # Additional check: if user message is short and has action words, likely continuation
         is_short_action_request = (
             len(user_message.split()) <= 10 and 
-            any(action in user_lower for action in ["create", "make", "generate", "show", "convert"])
+            any(action in user_lower for action in ["create", "make", "generate", "show", "convert", "proceed"])
         )
         
         return (has_continuation_keywords or is_short_action_request) and has_previous_document
@@ -102,51 +101,24 @@ class PowerPointOrchestrator:
         
         return self.agent_instances.get(agent_name)
 
-    async def _analyze_presentation_intent(self, user_input: str, document_content: str, has_previous_document: bool = False) -> Dict[str, Any]:
-        """Step 1: Analyze intent and determine slide count"""
+    async def _analyze_intent(self, user_input: str, has_previous_document: bool = False) -> Dict[str, Any]:
+        """Step 1: Intent analysis only"""
         try:
             smart_processor = self._get_agent("SmartPresentationProcessor")
             if not smart_processor:
                 raise Exception("SmartPresentationProcessor not available")
             
-            context_metadata = {
-                "document_content": document_content,
-                "has_previous_document": has_previous_document
-            }
-            
+            context_metadata = {"has_previous_document": has_previous_document}
             analysis_result = await smart_processor.process(user_input, context_metadata)
             
             if analysis_result.startswith('```json'):
                 analysis_result = analysis_result.replace('```json', '').replace('```', '').strip()
             
-            result = json.loads(analysis_result)
-            
-            # Ensure required fields
-            required_fields = ["intent", "confidence", "estimated_slides"]
-            for field in required_fields:
-                if field not in result:
-                    if field == "intent":
-                        result[field] = "CREATE_PRESENTATION"
-                    elif field == "confidence":
-                        result[field] = 0.7
-                    elif field == "estimated_slides":
-                        result[field] = 12
-            
-            return result
+            return json.loads(analysis_result)
             
         except (json.JSONDecodeError, Exception) as e:
-            print(f"Presentation analysis error: {str(e)}")
-            return self._create_presentation_fallback(user_input, document_content)
-
-    def _create_presentation_fallback(self, user_input: str, document_content: str) -> Dict[str, Any]:
-        """Create intelligent fallback for presentation analysis"""
-        return {
-            "intent": "CREATE_PRESENTATION",
-            "confidence": 0.6,
-            "reasoning": "Fallback analysis - generating standard business presentation",
-            "estimated_slides": 12,
-            "fallback_used": True
-        }
+            print(f"Intent analysis error: {str(e)}")
+            return {"intent": "CREATE_PRESENTATION", "confidence": 0.6, "reasoning": "Fallback"}
 
     async def _extract_document_content(self, content: str) -> str:
         """Step 2: Extract and organize document content"""
@@ -154,42 +126,48 @@ class PowerPointOrchestrator:
             extractor = self._get_agent("DocumentContentExtractor")
             if not extractor:
                 return content
-                
             return await extractor.process(content)
-            
         except Exception as e:
             print(f"Content extraction error: {str(e)}")
             return content
 
-    async def _create_presentation_structure(self, extracted_content: str, target_slides: int) -> str:
-        """Step 3: Create slide structure and outline"""
+    async def _create_presentation_structure(self, extracted_content: str) -> Dict[str, Any]:
+        """Step 3: Content analysis + slide planning + structure creation"""
         try:
             structure_agent = self._get_agent("PresentationStructureAgent")
             if not structure_agent:
-                return extracted_content
+                raise Exception("PresentationStructureAgent not available")
                 
-            context_metadata = {"target_slides": target_slides}
-            return await structure_agent.process(extracted_content, context_metadata)
+            structure_result = await structure_agent.process(extracted_content)
             
-        except Exception as e:
+            if structure_result.startswith('```json'):
+                structure_result = structure_result.replace('```json', '').replace('```', '').strip()
+            
+            return json.loads(structure_result)
+            
+        except (json.JSONDecodeError, Exception) as e:
             print(f"Structure creation error: {str(e)}")
-            return extracted_content
+            return {
+                "slide_planning": {"optimal_slides": PRESENTATION_CONFIG['default_slides']},
+                "presentation_structure": []
+            }
 
-    async def _generate_slide_content(self, structure: str) -> str:
+    async def _generate_slide_content(self, structure_data: Dict[str, Any]) -> str:
         """Step 4: Generate detailed slide content"""
         try:
             content_generator = self._get_agent("SlideContentGenerator")
             if not content_generator:
-                return structure
+                return json.dumps(structure_data.get("presentation_structure", []))
                 
-            return await content_generator.process(structure)
+            structure_json = json.dumps(structure_data.get("presentation_structure", []))
+            return await content_generator.process(structure_json)
             
         except Exception as e:
             print(f"Content generation error: {str(e)}")
-            return structure
+            return json.dumps(structure_data.get("presentation_structure", []))
 
     async def _build_powerpoint_file(self, slide_content: str, session_id: str) -> bytes:
-        """Step 5: Build actual PowerPoint file (rule-based)"""
+        """Step 5: Build actual PowerPoint file"""
         try:
             builder_agent = self._get_agent("PowerPointBuilderAgent")
             if not builder_agent:
@@ -198,7 +176,6 @@ class PowerPointOrchestrator:
             context_metadata = {"session_id": session_id}
             ppt_data = await builder_agent.process(slide_content, context_metadata)
             
-            # Convert to bytes if needed
             if isinstance(ppt_data, str):
                 return base64.b64decode(ppt_data)
             return ppt_data
@@ -208,16 +185,17 @@ class PowerPointOrchestrator:
             raise Exception(f"Failed to generate PowerPoint file: {str(e)}")
 
     def _provide_capabilities_info(self) -> str:
-        """Provide information about PowerPoint generation capabilities"""
+        """Provide capabilities information"""
         return """I can create professional PowerPoint presentations from your documents.
 
 **Features:**
-• 12-slide business presentations with company branding
+• Business presentations with company branding
 • Intelligent content organization and summarization
 • Clean slide layouts with proper formatting
 • Support for PDF and Word document input
+• Maximum {max_slides} slides with optimal content distribution
 
-Upload a document and I'll create a professional presentation automatically."""
+Upload a document and I'll create a professional presentation automatically.""".format(max_slides=get_max_slides())
 
     def _build_response(self, session_id: str, status: str, conversation: List[dict], **kwargs) -> Dict[str, Any]:
         """Build standardized API response"""
@@ -238,7 +216,7 @@ Upload a document and I'll create a professional presentation automatically."""
         return {"response_data": response_data}
 
     async def process_conversation_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        """Main entry point for PowerPoint generation requests"""
+        """Main entry point - refactored pipeline"""
         session_id = request.get('session_id', self._generate_session_id())
         conversation = request.get('conversation_history', [])
         user_message = request.get('user_message', '').strip()
@@ -256,122 +234,79 @@ Upload a document and I'll create a professional presentation automatically."""
             # Check for continuation requests if no current document
             if not document_content:
                 if self._is_continuation_request(user_message, conversation):
-                    print("Detected continuation request - looking for previous document...")
+                    print("Detected continuation request")
                     document_content, file_type = self._extract_document_from_conversation_history(conversation)
                     clean_user_input = user_message
                     
                     if document_content:
-                        print(f"Found previous {file_type} document in conversation history")
-                    else:
-                        print("No previous document found in conversation history")
+                        print(f"Found previous {file_type} document")
 
             if document_content:
-                # POWERPOINT GENERATION PIPELINE
-                print(f"Processing {file_type} document for PowerPoint generation...")
-                
                 has_previous_document = document_content != self._parse_document_extraction(user_message)[0]
                 
-                # Handle direct document upload without user text
                 if clean_user_input is None:
                     clean_user_input = "Create a professional presentation from this document"
                 
-                # STEP 1: Intent analysis and slide count optimization
-                analysis_result = await self._analyze_presentation_intent(
-                    clean_user_input, 
-                    document_content, 
-                    has_previous_document
-                )
-                
-                user_intent = analysis_result.get("intent", "CREATE_PRESENTATION")
-                estimated_slides = analysis_result.get("estimated_slides", 12)
-                # Apply max slide limit
-                max_slides = min(estimated_slides, 15)
+                # STEP 1: Intent analysis only (no slide count)
+                intent_result = await self._analyze_intent(clean_user_input, has_previous_document)
+                user_intent = intent_result.get("intent", "CREATE_PRESENTATION")
                 
                 if user_intent == "INFORMATION_REQUEST":
-                    # Provide capabilities information
                     info_response = self._provide_capabilities_info()
                     conversation.append({"role": "assistant", "content": info_response})
                     
-                    pipeline_info = get_quick_response_pipeline()
-                    
                     return self._build_response(session_id, "completed", conversation,
                                               processing_info={
-                                                  "intent": analysis_result,
+                                                  "intent": intent_result,
                                                   "file_type": file_type,
-                                                  "response_type": "capabilities_info",
-                                                  "context_source": "previous_conversation" if has_previous_document else "current_message"
+                                                  "response_type": "capabilities_info"
                                               },
-                                              pipeline_info=pipeline_info)
+                                              pipeline_info=get_quick_response_pipeline())
                 
                 elif user_intent == "CREATE_PRESENTATION":
-                    # Full PowerPoint generation pipeline
-                    print(f"Generating presentation with {max_slides} slides (limited from {estimated_slides})")
+                    print("Starting PowerPoint generation pipeline")
                     
                     # STEP 2: Extract and organize content
                     extracted_content = await self._extract_document_content(document_content)
                     
-                    # STEP 3: Create presentation structure
-                    presentation_structure = await self._create_presentation_structure(
-                        extracted_content, max_slides)
+                    # STEP 3: Content analysis + slide planning + structure (NEW COMBINED STEP)
+                    structure_data = await self._create_presentation_structure(extracted_content)
+                    
+                    optimal_slides = structure_data.get("slide_planning", {}).get("optimal_slides", PRESENTATION_CONFIG['default_slides'])
+                    print(f"Optimal slides determined: {optimal_slides} (max: {get_max_slides()})")
                     
                     # STEP 4: Generate detailed slide content
-                    slide_content = await self._generate_slide_content(presentation_structure)
+                    slide_content = await self._generate_slide_content(structure_data)
                     
                     # STEP 5: Build PowerPoint file
                     ppt_bytes = await self._build_powerpoint_file(slide_content, session_id)
                     ppt_base64 = base64.b64encode(ppt_bytes).decode('utf-8')
                     
-                    # Build response message
-                    if has_previous_document:
-                        response_text = f"I've created a presentation from the {file_type.upper()} document as requested. "
-                    else:
-                        response_text = f"I've created a professional business presentation from your {file_type.upper()} document. "
-                    
-                    response_text += f"The presentation contains {max_slides} slides with company branding and clean formatting."
-                    
+                    response_text = f"I've created a professional business presentation from your {file_type.upper()} document. The presentation contains {optimal_slides} slides with company branding and clean formatting."
                     conversation.append({"role": "assistant", "content": response_text})
-                    
-                    # Generate pipeline info
-                    pipeline_info = get_complete_pipeline()
                     
                     return self._build_response(session_id, "completed", conversation,
                                               processing_info={
-                                                  "intent": analysis_result,
-                                                  "max_slides": max_slides,
-                                                  "estimated_slides": estimated_slides,
+                                                  "intent": intent_result,
+                                                  "structure_analysis": structure_data.get("content_analysis", {}),
+                                                  "slide_planning": structure_data.get("slide_planning", {}),
                                                   "file_type": file_type,
-                                                  "response_type": "powerpoint_generation",
-                                                  "context_source": "previous_conversation" if has_previous_document else "current_message"
+                                                  "response_type": "powerpoint_generation"
                                               },
-                                              pipeline_info=pipeline_info,
+                                              pipeline_info=get_complete_pipeline(),
                                               powerpoint_output={
                                                   "ppt_data": ppt_base64,
                                                   "filename": f"presentation_{session_id}.pptx"
                                               })
-                
-                else:
-                    # Clarification needed (rare with smart processor)
-                    clarification_response = f"I can see you've uploaded a {file_type.upper()} document. Would you like me to create a presentation from it?"
-                    
-                    conversation.append({"role": "assistant", "content": clarification_response})
-                    
-                    return self._build_response(session_id, "needs_clarification", conversation,
-                                              processing_info={
-                                                  "intent": analysis_result,
-                                                  "file_type": file_type,
-                                                  "response_type": "clarification_request",
-                                                  "context_source": "previous_conversation" if has_previous_document else "current_message"
-                                              })
             
             else:
-                # No document found - provide guidance
+                # No document found
                 if any(keyword in user_message.lower() for keyword in ["presentation", "powerpoint", "slides", "ppt"]):
-                    response_text = "Please upload a PDF or Word document to create a presentation from. I can generate professional PowerPoint presentations with company branding."
+                    response_text = f"Please upload a PDF or Word document to create a presentation from. I can generate professional PowerPoint presentations up to {get_max_slides()} slides with company branding."
                 else:
                     response_text = self._provide_capabilities_info()
                 
                 conversation.append({"role": "assistant", "content": response_text})
-                
                 return self._build_response(session_id, "waiting_for_file", conversation)
         
         except Exception as e:
@@ -380,5 +315,4 @@ Upload a document and I'll create a professional presentation automatically."""
             
             conversation.append({"role": "assistant", "content": "I encountered an error generating your presentation. Please try again or upload a different document."})
             
-            return self._build_response(session_id, "error", conversation,
-                                      error_message=error_message)
+            return self._build_response(session_id, "error", conversation, error_message=error_message)

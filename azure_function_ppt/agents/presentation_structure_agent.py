@@ -1,21 +1,22 @@
 """
-Presentation Structure Agent - Creates slide-by-slide outline
+Presentation Structure Agent - Content analysis + slide planning + structure creation
 """
 from semantic_kernel.agents import ChatCompletionAgent
 from semantic_kernel.functions import KernelArguments
-from config import get_ai_service, apply_config_overrides
+from config import get_ai_service, apply_config_overrides, get_max_slides, PRESENTATION_CONFIG
 from typing import Dict, Any, Optional
 from agents.core.base_agent import BaseAgent
+import json
 
 class PresentationStructureAgent(BaseAgent):
-    """Creates presentation structure and slide outline"""
+    """Analyzes content volume, determines optimal slides, and creates presentation structure"""
 
-    agent_description = "Presentation structure planning and slide outline creation"
+    agent_description = "Content analysis, slide count determination, and presentation structure creation"
     agent_use_cases = [
-        "Slide sequence optimization",
-        "Presentation flow design", 
-        "Content distribution across slides",
-        "Narrative structure creation"
+        "Content volume analysis",
+        "Optimal slide count determination", 
+        "Slide sequence planning",
+        "Presentation structure creation"
     ]
 
     def __init__(self, **kwargs):
@@ -23,45 +24,60 @@ class PresentationStructureAgent(BaseAgent):
         config = apply_config_overrides(self.__class__.__name__, **kwargs)
         self.service, self.default_execution_settings = get_ai_service(**config)
 
-        instructions = """
-        You are a Presentation Structure Expert that creates compelling slide sequences from organized content.
+        instructions = f"""
+        You are a Presentation Structure Expert that analyzes content and creates optimal slide structures.
 
-        CREATE PRESENTATION STRUCTURE:
-        - Logical slide progression that tells a story
-        - Appropriate slide types for different content
-        - Balanced information distribution
-        - Engaging flow with clear transitions
+        YOUR RESPONSIBILITIES:
+        1. **Content Volume Analysis**: Assess how much content needs to be presented
+        2. **Slide Count Determination**: Calculate optimal slides based on content density
+        3. **Structure Creation**: Design logical slide sequence and flow
 
-        SLIDE SEQUENCE PRINCIPLES:
-        1. **Opening**: Title slide with clear topic
-        2. **Agenda**: Overview of presentation structure (if needed)
-        3. **Content Flow**: Main topics in logical order
-        4. **Supporting**: Details that build the narrative
-        5. **Conclusion**: Summary and key takeaways
+        SLIDE COUNT GUIDELINES:
+        - **Default**: {PRESENTATION_CONFIG['default_slides']} slides for standard content
+        - **Minimum**: {PRESENTATION_CONFIG['min_slides']} slides (even for simple content)
+        - **Maximum**: {PRESENTATION_CONFIG['max_slides']} slides (HARD LIMIT - never exceed)
+        - **Content Density**: More complex content = more slides (up to max)
 
-        SLIDE TYPES:
-        - TITLE_SLIDE: Opening slide with presentation title
-        - AGENDA_SLIDE: Presentation outline
-        - CONTENT_SLIDE: Standard content with bullet points
-        - SUMMARY_SLIDE: Key takeaways and conclusions
+        SLIDE COUNT CALCULATION:
+        - Light content (1-2 main topics): 8-10 slides
+        - Medium content (3-5 main topics): 10-12 slides  
+        - Heavy content (6+ main topics): 12-15 slides
+        - Always respect the {PRESENTATION_CONFIG['max_slides']} slide maximum
 
-        OUTPUT FORMAT:
-        Provide slide-by-slide structure with clear slide numbers, titles, and content outline:
+        PRESENTATION STRUCTURE:
+        - Slide 1: Title slide
+        - Slides 2-N: Content slides (main topics)
+        - Final slide: Summary/conclusion
 
-        ## Slide 1: [Title]
-        **Type:** TITLE_SLIDE
-        **Content:**
-        - Main title
-        - Subtitle
+        OUTPUT FORMAT (JSON):
+        {{
+            "content_analysis": {{
+                "main_topics": ["topic1", "topic2", ...],
+                "content_complexity": "light|medium|heavy",
+                "estimated_duration": "10-15 minutes"
+            }},
+            "slide_planning": {{
+                "optimal_slides": 12,
+                "reasoning": "Content has X main topics requiring Y slides",
+                "max_slides_enforced": {get_max_slides()}
+            }},
+            "presentation_structure": [
+                {{
+                    "slide_number": 1,
+                    "slide_type": "TITLE_SLIDE",
+                    "title": "Presentation Title",
+                    "content_outline": ["Main title", "Subtitle"]
+                }},
+                {{
+                    "slide_number": 2,
+                    "slide_type": "CONTENT_SLIDE", 
+                    "title": "Topic Title",
+                    "content_outline": ["Key point 1", "Key point 2", "Key point 3"]
+                }}
+            ]
+        }}
 
-        ## Slide 2: [Title]  
-        **Type:** CONTENT_SLIDE
-        **Content:**
-        - Key point 1
-        - Key point 2
-        - Key point 3
-
-        Ensure smooth narrative flow and appropriate content distribution for business presentations.
+        CRITICAL: Never exceed {get_max_slides()} slides regardless of content volume.
         """
 
         self.agent = ChatCompletionAgent(
@@ -71,24 +87,34 @@ class PresentationStructureAgent(BaseAgent):
         )
 
     async def process(self, extracted_content: str, context_metadata: Optional[Dict[str, Any]] = None) -> str:
-        """Create presentation structure from extracted content"""
+        """Analyze content and create presentation structure"""
         try:
-            target_slides = context_metadata.get("target_slides", 12) if context_metadata else 12
+            analysis_prompt = f"""
+            CONTENT ANALYSIS & STRUCTURE CREATION:
             
-            structure_prompt = f"""
-            PRESENTATION STRUCTURE CREATION:
+            EXTRACTED CONTENT: "{extracted_content[:2000]}..."
             
-            EXTRACTED CONTENT: "{extracted_content}"
-            TARGET SLIDES: {target_slides}
+            Analyze this content and create an optimal presentation structure:
             
-            Create a well-structured business presentation outline with {target_slides} slides from the extracted content.
+            1. **Content Analysis**: 
+               - Identify main topics and themes
+               - Assess content complexity and volume
+               - Determine content density
             
-            Create logical slide progression that tells a compelling story.
-            Distribute content evenly across slides while maintaining narrative flow.
-            Focus on business presentation best practices with clear structure.
+            2. **Slide Count Determination**:
+               - Calculate optimal slides based on content
+               - Respect maximum limit of {get_max_slides()} slides
+               - Ensure minimum of {PRESENTATION_CONFIG['min_slides']} slides
+            
+            3. **Structure Creation**:
+               - Design logical slide sequence
+               - Distribute content appropriately
+               - Create slide-by-slide outline
+            
+            Focus on creating a compelling narrative flow that effectively presents all key information.
             """
             
-            self.add_user_message(structure_prompt)
+            self.add_user_message(analysis_prompt)
             
             arguments = KernelArguments(settings=self.default_execution_settings)
             
@@ -100,41 +126,116 @@ class PresentationStructureAgent(BaseAgent):
             response_content = str(response.content) if hasattr(response, 'content') else str(response)
             self.add_assistant_message(response_content)
             
-            return response_content
+            return self._validate_and_enforce_limits(response_content, extracted_content)
 
         except Exception as e:
             print(f"Structure creation error: {str(e)}")
-            return self._fallback_structure(extracted_content, target_slides)
+            return self._create_fallback_structure(extracted_content)
 
-    def _fallback_structure(self, content: str, target_slides: int) -> str:
-        """Simple fallback structure creation"""
-        structure = []
-        content_sections = content.split('#')
-        content_sections = [s.strip() for s in content_sections if s.strip()]
-        
-        # Title slide
-        structure.append("""## Slide 1: Presentation Title
-**Type:** TITLE_SLIDE
-**Content:**
-- Document Analysis Presentation
-- Key Insights and Information""")
-        
-        # Content slides
-        slides_per_section = max(1, (target_slides - 1) // max(1, len(content_sections)))
-        slide_num = 2
-        
-        for section in content_sections[:target_slides-1]:
-            lines = section.split('\n')
-            title = lines[0] if lines else "Content Section"
-            content_points = [line.lstrip('- ') for line in lines[1:] if line.strip().startswith('-')][:6]
+    def _validate_and_enforce_limits(self, ai_response: str, content: str) -> str:
+        """Validate response and enforce slide limits"""
+        try:
+            if ai_response.startswith('```json'):
+                ai_response = ai_response.replace('```json', '').replace('```', '').strip()
             
-            structure.append(f"""## Slide {slide_num}: {title}
-**Type:** CONTENT_SLIDE
-**Content:**
-{chr(10).join(f'- {point}' for point in content_points[:6])}""")
-            slide_num += 1
+            result = json.loads(ai_response)
             
-            if slide_num > target_slides:
-                break
+            # Enforce slide count limits
+            slide_planning = result.get("slide_planning", {})
+            optimal_slides = slide_planning.get("optimal_slides", PRESENTATION_CONFIG['default_slides'])
+            
+            # Apply hard limits
+            max_slides = get_max_slides()
+            min_slides = PRESENTATION_CONFIG['min_slides']
+            
+            if optimal_slides > max_slides:
+                optimal_slides = max_slides
+                slide_planning["reasoning"] += f" | Limited to maximum {max_slides} slides"
+                slide_planning["max_slides_enforced"] = max_slides
+            elif optimal_slides < min_slides:
+                optimal_slides = min_slides
+                slide_planning["reasoning"] += f" | Minimum {min_slides} slides enforced"
+            
+            slide_planning["optimal_slides"] = optimal_slides
+            result["slide_planning"] = slide_planning
+            
+            # Ensure structure matches slide count
+            structure = result.get("presentation_structure", [])
+            if len(structure) != optimal_slides:
+                result["presentation_structure"] = self._adjust_structure_length(structure, optimal_slides)
+            
+            return json.dumps(result, indent=2)
+            
+        except (json.JSONDecodeError, Exception) as e:
+            print(f"Structure validation error: {str(e)}")
+            return self._create_fallback_structure(content)
+
+    def _adjust_structure_length(self, structure: list, target_slides: int) -> list:
+        """Adjust structure to match target slide count"""
+        if len(structure) == target_slides:
+            return structure
         
-        return '\n\n'.join(structure)
+        if len(structure) > target_slides:
+            # Too many slides - keep title + summary + middle content
+            return structure[:target_slides]
+        
+        # Too few slides - add content slides
+        adjusted = structure.copy()
+        while len(adjusted) < target_slides:
+            slide_num = len(adjusted) + 1
+            adjusted.append({
+                "slide_number": slide_num,
+                "slide_type": "CONTENT_SLIDE",
+                "title": f"Additional Content {slide_num - 1}",
+                "content_outline": ["Key information", "Supporting details", "Examples"]
+            })
+        
+        return adjusted
+
+    def _create_fallback_structure(self, content: str) -> str:
+        """Create fallback structure when AI analysis fails"""
+        default_slides = PRESENTATION_CONFIG['default_slides']
+        
+        # Simple content analysis
+        content_sections = content.split('\n\n')
+        main_topics = [section[:50] + "..." for section in content_sections[:5] if section.strip()]
+        
+        structure = [
+            {
+                "slide_number": 1,
+                "slide_type": "TITLE_SLIDE",
+                "title": "Document Presentation",
+                "content_outline": ["Main title", "Document overview"]
+            }
+        ]
+        
+        # Add content slides
+        for i, topic in enumerate(main_topics[:default_slides-2], 2):
+            structure.append({
+                "slide_number": i,
+                "slide_type": "CONTENT_SLIDE",
+                "title": f"Topic {i-1}",
+                "content_outline": [topic, "Supporting information", "Key details"]
+            })
+        
+        # Add summary slide
+        structure.append({
+            "slide_number": default_slides,
+            "slide_type": "SUMMARY_SLIDE",
+            "title": "Summary",
+            "content_outline": ["Key takeaways", "Main conclusions", "Next steps"]
+        })
+        
+        return json.dumps({
+            "content_analysis": {
+                "main_topics": main_topics,
+                "content_complexity": "medium",
+                "estimated_duration": "15-20 minutes"
+            },
+            "slide_planning": {
+                "optimal_slides": default_slides,
+                "reasoning": "Fallback analysis - using default slide count",
+                "max_slides_enforced": get_max_slides()
+            },
+            "presentation_structure": structure
+        }, indent=2)

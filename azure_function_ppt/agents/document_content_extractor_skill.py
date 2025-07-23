@@ -24,7 +24,7 @@ class DocumentContentExtractor(BaseAgent):
         self.service, self.default_execution_settings = get_ai_service(**config)
 
         instructions = """
-        You are a Content Organization Expert that analyzes documents to extract key information for PowerPoint presentations.
+        You are a Content Organization Expert that analyzes documents to extract key information for business presentations.
 
         ANALYZE AND ORGANIZE:
         - Document structure and main topics
@@ -56,7 +56,7 @@ class DocumentContentExtractor(BaseAgent):
         - Key point 1
         - Key point 2
 
-        Keep content concise and presentation-ready. Focus on the most important information that would engage an audience.
+        Keep content concise and presentation-ready. Focus on the most important information for business presentations.
         """
 
         self.agent = ChatCompletionAgent(
@@ -68,21 +68,13 @@ class DocumentContentExtractor(BaseAgent):
     async def process(self, content: str, context_metadata: Optional[Dict[str, Any]] = None) -> str:
         """Extract and organize document content"""
         try:
-            presentation_type = context_metadata.get("presentation_type", "GENERAL_PRESENTATION") if context_metadata else "GENERAL_PRESENTATION"
-            
             analysis_prompt = f"""
             DOCUMENT CONTENT EXTRACTION:
             
             DOCUMENT TEXT: "{content[:3000]}..."
-            PRESENTATION TYPE: {presentation_type}
             
-            Extract and organize the key information from this document for a {presentation_type} presentation.
+            Extract and organize the key information from this document for a business presentation.
             Focus on identifying the main topics and supporting points that would work well as slides.
-            
-            Consider the presentation type:
-            - EXECUTIVE_SUMMARY: Focus on high-level insights and strategic points
-            - DOCUMENT_ANALYSIS: Include detailed technical information and analysis
-            - GENERAL_PRESENTATION: Balance overview with important details
             
             Organize content into clear topics with bullet points suitable for slides.
             """

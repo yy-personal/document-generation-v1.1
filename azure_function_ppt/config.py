@@ -38,16 +38,16 @@ SUPPORTED_OUTPUT_FORMATS = [
 # PRESENTATION CONFIGURATION
 # ====================================================================
 
-# Standard presentation settings
+# Slide count settings - CENTRALIZED CONTROL
 PRESENTATION_CONFIG = {
     "default_slides": 12,
-    "max_slides": 15,
-    "min_slides": 8,
+    "max_slides": 15,        # MAXIMUM allowed slides
+    "min_slides": 3,
     "use_case": "Standard business presentations for all content types"
 }
 
 # ====================================================================
-# SLIDE LAYOUTS
+# SLIDE LAYOUTS  
 # ====================================================================
 
 SLIDE_LAYOUTS = {
@@ -57,31 +57,6 @@ SLIDE_LAYOUTS = {
     "TWO_COLUMN_SLIDE": "Comparative content, before/after, pros/cons",
     "SUMMARY_SLIDE": "Key takeaways and conclusions (3-6 points)",
     "THANK_YOU_SLIDE": "Contact information and next steps"
-}
-
-# ====================================================================
-# COMPANY BRANDING
-# ====================================================================
-
-COMPANY_DESIGN_STANDARDS = {
-    "color_scheme": {
-        "primary": "#1F4E79",      # Company blue
-        "secondary": "#70AD47",    # Company green  
-        "accent": "#C55A11",       # Company orange
-        "text_dark": "#2F2F2F",
-        "text_light": "#FFFFFF"
-    },
-    "fonts": {
-        "title": ("Calibri", 32, True),     # (font, size, bold)
-        "subtitle": ("Calibri", 24, False),
-        "body": ("Calibri Light", 18, False),
-        "footer": ("Calibri", 12, False)
-    },
-    "branding": {
-        "logo_position": "top_right",
-        "logo_size": (1.5, 0.5),   # inches
-        "footer_template": "Company Name | Confidential"
-    }
 }
 
 # ====================================================================
@@ -97,7 +72,7 @@ CONTENT_PROCESSORS = [
 FILE_GENERATOR = ["PowerPointBuilderAgent"]
 
 def get_complete_pipeline() -> list:
-    """Get complete PowerPoint generation pipeline (4 AI calls + 1 rule-based)"""
+    """Get complete PowerPoint generation pipeline"""
     return [
         "SmartPresentationProcessor",
         "DocumentContentExtractor", 
@@ -107,7 +82,7 @@ def get_complete_pipeline() -> list:
     ]
 
 def get_quick_response_pipeline() -> list:
-    """Get pipeline for information requests about presentation capabilities"""
+    """Get pipeline for information requests"""
     return ["SmartPresentationProcessor"]
 
 # ====================================================================
@@ -115,38 +90,38 @@ def get_quick_response_pipeline() -> list:
 # ====================================================================
 
 DEFAULT_AGENT_CONFIGS = {
-    # Intent analysis + slide count optimization
+    # Intent analysis only
     "SmartPresentationProcessor": {
-        "max_tokens": 4000,
-        "temperature": 0.3,    # Structured analysis
+        "max_tokens": 3000,     # Reduced - no slide count logic
+        "temperature": 0.3,
         "top_p": 0.8
     },
     
-    # Content organization and extraction
+    # Content organization only
     "DocumentContentExtractor": {
         "max_tokens": 8000,
-        "temperature": 0.4,    # Balanced organization
+        "temperature": 0.4,
         "top_p": 0.9
     },
     
-    # Slide planning and structure
+    # Content analysis + slide planning + structure
     "PresentationStructureAgent": {
-        "max_tokens": 6000,
-        "temperature": 0.5,    # Creative structure
+        "max_tokens": 8000,     # Increased - handles slide count logic
+        "temperature": 0.5,
         "top_p": 0.9
     },
     
     # Content creation and formatting
     "SlideContentGenerator": {
         "max_tokens": 10000,
-        "temperature": 0.6,    # Creative content
+        "temperature": 0.6,
         "top_p": 0.9
     },
     
-    # File generation (rule-based, minimal AI)
+    # File generation (rule-based)
     "PowerPointBuilderAgent": {
         "max_tokens": 4000,
-        "temperature": 0.2,    # Consistent formatting
+        "temperature": 0.2,
         "top_p": 0.8
     }
 }
@@ -172,6 +147,10 @@ def apply_config_overrides(agent_class_name: str, **overrides) -> dict:
     config = get_agent_config(agent_class_name)
     config.update(overrides)
     return config
+
+def get_max_slides() -> int:
+    """Get maximum allowed slides"""
+    return PRESENTATION_CONFIG["max_slides"]
 
 def get_ai_service(max_tokens=800, temperature=1.0, top_p=1.0, frequency_penalty=0.0, presence_penalty=0.0):
     """Get Azure OpenAI service and execution settings"""
