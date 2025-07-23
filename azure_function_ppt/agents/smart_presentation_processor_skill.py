@@ -83,13 +83,16 @@ class SmartPresentationProcessor(BaseAgent):
                 arguments=arguments
             )
 
-            # --- THE FIX ---
-            if response and isinstance(response, list) and len(response) > 0:
+            # Handle semantic kernel response
+            if hasattr(response, 'message'):
+                # New format: AgentResponseItem with message attribute
+                response_content = str(response.message.content) if hasattr(response.message, 'content') else str(response.message)
+            elif isinstance(response, list) and len(response) > 0:
+                # Old format: list of messages
                 last_message = response[-1]
-                response_content = str(last_message.content)
+                response_content = str(last_message.content) if hasattr(last_message, 'content') else str(last_message)
             else:
                 response_content = str(response)
-            # --- END FIX ---
 
             self.add_assistant_message(response_content)
             

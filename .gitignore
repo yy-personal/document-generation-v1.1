@@ -1,6 +1,47 @@
+# Node.js
 /frontend/node_modules
 /node_modules
+
+# Environment files
 .env
+*.env.local
+*.env.development.local
+*.env.test.local
+*.env.production.local
+
+# Python
 *.pyc
-/azure_function_ppt/local_output
-*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Azure Functions
+/azure_function_ppt/local_output/
+/azure_function_pdf/local_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

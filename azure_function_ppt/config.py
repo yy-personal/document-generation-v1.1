@@ -113,7 +113,7 @@ DEFAULT_AGENT_CONFIGS = {
     
     # Content creation and formatting
     "SlideContentGenerator": {
-        "max_tokens": 10000,
+        "max_tokens": 8000,     # Reduced from 10000 to avoid service limits
         "temperature": 0.6,
         "top_p": 0.9
     },
