@@ -135,6 +135,26 @@ SESSION_ID_DATE_FORMAT = "%d%m%Y"
 SESSION_ID_UNIQUE_LENGTH = 8
 
 # ====================================================================
+# TEMPLATE CONFIGURATION
+# ====================================================================
+
+TEMPLATE_CONFIG = {
+    "default_template": "templates/default_template.pptx",
+    "company_template": "templates/company_template.pptx", 
+    "executive_template": "templates/executive_template.pptx",
+    "technical_template": "templates/technical_template.pptx",
+    "fallback_template": None  # Use python-pptx default if templates fail
+}
+
+# Template selection based on presentation type or content
+TEMPLATE_MAPPING = {
+    "executive": "company_template",
+    "technical": "technical_template", 
+    "general": "default_template",
+    "default": "default_template"
+}
+
+# ====================================================================
 # UTILITY FUNCTIONS
 # ====================================================================
 
@@ -151,6 +171,25 @@ def apply_config_overrides(agent_class_name: str, **overrides) -> dict:
 def get_max_slides() -> int:
     """Get maximum allowed slides"""
     return PRESENTATION_CONFIG["max_slides"]
+
+def get_template_path(template_type: str = "default") -> str:
+    """Get template file path based on presentation type"""
+    import os
+    
+    # Get template name from mapping
+    template_name = TEMPLATE_MAPPING.get(template_type, "default_template")
+    template_path = TEMPLATE_CONFIG.get(template_name)
+    
+    if template_path and os.path.exists(template_path):
+        return template_path
+    
+    # Try fallback template
+    fallback = TEMPLATE_CONFIG.get("fallback_template")
+    if fallback and os.path.exists(fallback):
+        return fallback
+    
+    # Return None to use python-pptx default
+    return None
 
 def get_ai_service(max_tokens=800, temperature=1.0, top_p=1.0, frequency_penalty=0.0, presence_penalty=0.0):
     """Get Azure OpenAI service and execution settings"""

@@ -4,7 +4,9 @@
       "Bash(python test:*)",
       "Bash(python:*)",
       "Bash(find:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(mkdir:*)",
+      "WebFetch(domain:python-pptx.readthedocs.io)"
     ],
     "deny": []
   }

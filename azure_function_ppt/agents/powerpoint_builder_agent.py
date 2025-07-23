@@ -1,13 +1,15 @@
 """
-PowerPoint Builder Agent - Simplified with 2-color theme
+PowerPoint Builder Agent - With template support
 """
 from pptx import Presentation
 from pptx.util import Pt
 from pptx.dml.color import RGBColor
 from typing import Dict, Any, Optional
 from agents.core.base_agent import BaseAgent
+from config import get_template_path
 import json
 import io
+import os
 
 class PowerPointBuilderAgent(BaseAgent):
     """Builds PowerPoint files with simple 2-color theme"""
@@ -17,10 +19,11 @@ class PowerPointBuilderAgent(BaseAgent):
     ACCENT_COLOR = RGBColor(209, 185, 91)    # #d1b95b (gold)
     TEXT_COLOR = RGBColor(51, 51, 51)        # Dark gray
 
-    agent_description = "Simple PowerPoint file generation with 2-color theme"
+    agent_description = "PowerPoint file generation with template support"
     agent_use_cases = [
         "PowerPoint file creation from slide content",
-        "Simple theme application",
+        "Template-based presentation generation",
+        "Custom branding and layouts", 
         "Professional formatting"
     ]
 
@@ -28,10 +31,18 @@ class PowerPointBuilderAgent(BaseAgent):
         super().__init__()
 
     async def process(self, slide_content: str, context_metadata: Optional[Dict[str, Any]] = None) -> bytes:
-        """Generate PowerPoint file from slide content"""
+        """Generate PowerPoint file from slide content with template support"""
         try:
             slides_data = self._parse_slide_content(slide_content)
-            prs = Presentation()
+            
+            # Use template if available
+            template_path = get_template_path("default")
+            if template_path:
+                print(f"Using template: {template_path}")
+                prs = Presentation(template_path)
+            else:
+                print("Using python-pptx default template")
+                prs = Presentation()
             
             for slide_info in slides_data:
                 self._create_slide(prs, slide_info)
@@ -44,6 +55,24 @@ class PowerPointBuilderAgent(BaseAgent):
             
         except Exception as e:
             print(f"PowerPoint building error: {str(e)}")
+            # If template failed, try without template
+            if "template" in str(e).lower():
+                print("Template failed, falling back to default")
+                try:
+                    slides_data = self._parse_slide_content(slide_content)
+                    prs = Presentation()  # Use default
+                    
+                    for slide_info in slides_data:
+                        self._create_slide(prs, slide_info)
+                    
+                    ppt_buffer = io.BytesIO()
+                    prs.save(ppt_buffer)
+                    ppt_buffer.seek(0)
+                    
+                    return ppt_buffer.read()
+                except Exception as fallback_error:
+                    raise Exception(f"Failed to generate PowerPoint even with fallback: {str(fallback_error)}")
+            
             raise Exception(f"Failed to generate PowerPoint: {str(e)}")
 
     def _parse_slide_content(self, slide_content: str) -> list:
