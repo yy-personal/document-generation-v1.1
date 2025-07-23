@@ -45,7 +45,7 @@ class SlideContentGenerator(BaseAgent):
         - Well-formatted bullet points
         - Appropriate content length for readability
 
-        OUTPUT FORMAT:
+        OUTPUT FORMAT (JSON only, no markdown):
         Generate slide content in JSON format:
 
         [
@@ -61,6 +61,7 @@ class SlideContentGenerator(BaseAgent):
         ]
 
         Focus on creating content that will engage the audience and communicate key messages effectively.
+        Your entire output must be a single, valid JSON array.
         """
 
         self.agent = ChatCompletionAgent(
@@ -81,12 +82,11 @@ class SlideContentGenerator(BaseAgent):
             
             Requirements for business presentations:
             - Professional, business-appropriate language
-            - Clear, actionable bullet points
-            - Consistent formatting and style
+            - Clear, actionable bullet points (max 6 per slide)
             - Content optimized for visual presentation
             
-            Create compelling slide content that will engage the audience and effectively communicate the key messages.
-            Output in JSON format with slide objects containing title, content array, and layout type.
+            Create compelling slide content that effectively communicates the key messages.
+            Output in JSON format with a list of slide objects. Each object must contain 'title', 'content' (an array of strings), and 'layout'.
             """
             
             self.add_user_message(content_prompt)
@@ -98,7 +98,12 @@ class SlideContentGenerator(BaseAgent):
                 arguments=arguments
             )
 
-            response_content = str(response.content) if hasattr(response, 'content') else str(response)
+            if response and isinstance(response, list) and len(response) > 0:
+                last_message = response[-1]
+                response_content = str(last_message.content)
+            else:
+                response_content = str(response)
+
             self.add_assistant_message(response_content)
             
             return response_content
@@ -108,33 +113,32 @@ class SlideContentGenerator(BaseAgent):
             return self._fallback_content_generation(structure)
 
     def _fallback_content_generation(self, structure: str) -> str:
-        """Simple fallback content generation"""        
+        """Simple fallback content generation"""
         slides = []
-        slide_sections = structure.split('## Slide')
-        
-        for i, section in enumerate(slide_sections[1:], 1):  # Skip first empty split
-            lines = section.strip().split('\n')
-            title_line = lines[0] if lines else f"Slide {i}"
+        try:
+            structure_data = json.loads(structure)
+            slide_list = structure_data.get("presentation_structure", [])
+
+            for slide_plan in slide_list:
+                slides.append({
+                    "title": slide_plan.get("title", "Fallback Title"),
+                    "content": slide_plan.get("content_outline", ["Fallback content."]),
+                    "layout": slide_plan.get("slide_type", "CONTENT_SLIDE")
+                })
             
-            # Extract title (remove slide number)
-            title = title_line.split(':', 1)[1].strip() if ':' in title_line else title_line.strip()
-            
-            # Extract content points
-            content_points = []
-            for line in lines:
-                if line.strip().startswith('- '):
-                    content_points.append(line.strip()[2:])
-            
-            if not content_points:
-                content_points = [f"Content from slide {i}"]
-            
-            # Determine layout
-            layout = "TITLE_SLIDE" if i == 1 else "CONTENT_SLIDE"
-            
-            slides.append({
-                "title": title,
-                "content": content_points[:6],  # Max 6 points
-                "layout": layout
-            })
-        
+            if not slides: # If parsing fails, use old method
+                raise ValueError("Could not parse structure")
+
+        except (json.JSONDecodeError, ValueError):
+             # This is a less reliable fallback, kept for safety
+            slide_sections = structure.split('## Slide')
+            for i, section in enumerate(slide_sections[1:], 1):
+                lines = section.strip().split('\n')
+                title_line = lines[0] if lines else f"Slide {i}"
+                title = title_line.split(':', 1)[1].strip() if ':' in title_line else title_line.strip()
+                content_points = [line.strip()[2:] for line in lines if line.strip().startswith('- ')]
+                if not content_points: content_points = [f"Content for slide {i}"]
+                layout = "TITLE_SLIDE" if i == 1 else "CONTENT_SLIDE"
+                slides.append({"title": title, "content": content_points[:6], "layout": layout})
+
         return json.dumps(slides, indent=2)

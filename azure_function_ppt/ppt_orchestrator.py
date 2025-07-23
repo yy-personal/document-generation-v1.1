@@ -193,9 +193,7 @@ class PowerPointOrchestrator:
 • Intelligent content organization and summarization
 • Clean slide layouts with proper formatting
 • Support for PDF and Word document input
-• Maximum {max_slides} slides with optimal content distribution
-
-Upload a document and I'll create a professional presentation automatically.""".format(max_slides=get_max_slides())
+• Maximum {max_slides} slides with optimal content distribution""".format(max_slides=get_max_slides())
 
     def _build_response(self, session_id: str, status: str, conversation: List[dict], **kwargs) -> Dict[str, Any]:
         """Build standardized API response"""
@@ -285,19 +283,38 @@ Upload a document and I'll create a professional presentation automatically.""".
                     response_text = f"I've created a professional business presentation from your {file_type.upper()} document. The presentation contains {optimal_slides} slides with company branding and clean formatting."
                     conversation.append({"role": "assistant", "content": response_text})
                     
-                    return self._build_response(session_id, "completed", conversation,
-                                              processing_info={
-                                                  "intent": intent_result,
-                                                  "structure_analysis": structure_data.get("content_analysis", {}),
-                                                  "slide_planning": structure_data.get("slide_planning", {}),
-                                                  "file_type": file_type,
-                                                  "response_type": "powerpoint_generation"
-                                              },
-                                              pipeline_info=get_complete_pipeline(),
-                                              powerpoint_output={
-                                                  "ppt_data": ppt_base64,
-                                                  "filename": f"presentation_{session_id}.pptx"
-                                              })
+                    # --- FIX START ---
+                    # For easier debugging, add the final JSON content to the response.
+                    # First, try to parse the JSON string from the generator into a Python object.
+                    try:
+                        powerpoint_json_content = json.loads(slide_content)
+                    except (json.JSONDecodeError, TypeError):
+                        # If it fails (e.g., it's not valid JSON), just keep the raw string.
+                        powerpoint_json_content = slide_content
+                    
+                    # Now, build the processing_info dictionary with the new debug key.
+                    processing_info = {
+                        "intent": intent_result,
+                        "structure_analysis": structure_data.get("content_analysis", {}),
+                        "slide_planning": structure_data.get("slide_planning", {}),
+                        "powerpoint_json_content": powerpoint_json_content, # The new debugging key
+                        "file_type": file_type,
+                        "response_type": "powerpoint_generation"
+                    }
+                    
+                    # Finally, build the final response using this complete info dictionary.
+                    return self._build_response(
+                        session_id, 
+                        "completed", 
+                        conversation,
+                        processing_info=processing_info,
+                        pipeline_info=get_complete_pipeline(),
+                        powerpoint_output={
+                            "ppt_data": ppt_base64,
+                            "filename": f"presentation_{session_id}.pptx"
+                        }
+                    )
+                    # --- FIX END ---
             
             else:
                 # No document found

@@ -2,3 +2,4 @@
 /node_modules
 .env
 *.pyc
+/azure_function_ppt/local_output

@@ -76,7 +76,7 @@ class DocumentContentExtractor(BaseAgent):
             Extract and organize the key information from this document for a business presentation.
             Focus on identifying the main topics and supporting points that would work well as slides.
             
-            Organize content into clear topics with bullet points suitable for slides.
+            Organize content into clear topics with bullet points suitable for slides, using markdown headings.
             """
             
             self.add_user_message(analysis_prompt)
@@ -88,7 +88,12 @@ class DocumentContentExtractor(BaseAgent):
                 arguments=arguments
             )
 
-            response_content = str(response.content) if hasattr(response, 'content') else str(response)
+            if response and isinstance(response, list) and len(response) > 0:
+                last_message = response[-1]
+                response_content = str(last_message.content)
+            else:
+                response_content = str(response)
+
             self.add_assistant_message(response_content)
             
             return response_content

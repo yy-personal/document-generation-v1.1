@@ -49,7 +49,7 @@ class PresentationStructureAgent(BaseAgent):
         - Slides 2-N: Content slides (main topics)
         - Final slide: Summary/conclusion
 
-        OUTPUT FORMAT (JSON):
+        OUTPUT FORMAT (JSON only, no markdown):
         {{
             "content_analysis": {{
                 "main_topics": ["topic1", "topic2", ...],
@@ -77,7 +77,7 @@ class PresentationStructureAgent(BaseAgent):
             ]
         }}
 
-        CRITICAL: Never exceed {get_max_slides()} slides regardless of content volume.
+        CRITICAL: Never exceed {get_max_slides()} slides regardless of content volume. Your entire output must be a single, valid JSON object.
         """
 
         self.agent = ChatCompletionAgent(
@@ -92,26 +92,14 @@ class PresentationStructureAgent(BaseAgent):
             analysis_prompt = f"""
             CONTENT ANALYSIS & STRUCTURE CREATION:
             
-            EXTRACTED CONTENT: "{extracted_content[:2000]}..."
+            EXTRACTED CONTENT: "{extracted_content[:2500]}..."
             
-            Analyze this content and create an optimal presentation structure:
+            Analyze this content and create an optimal presentation structure.
+            1. Analyze content to identify main topics and complexity.
+            2. Determine the optimal number of slides (between {PRESENTATION_CONFIG['min_slides']} and {get_max_slides()}).
+            3. Create a detailed slide-by-slide outline in the specified JSON format.
             
-            1. **Content Analysis**: 
-               - Identify main topics and themes
-               - Assess content complexity and volume
-               - Determine content density
-            
-            2. **Slide Count Determination**:
-               - Calculate optimal slides based on content
-               - Respect maximum limit of {get_max_slides()} slides
-               - Ensure minimum of {PRESENTATION_CONFIG['min_slides']} slides
-            
-            3. **Structure Creation**:
-               - Design logical slide sequence
-               - Distribute content appropriately
-               - Create slide-by-slide outline
-            
-            Focus on creating a compelling narrative flow that effectively presents all key information.
+            Focus on creating a compelling narrative flow.
             """
             
             self.add_user_message(analysis_prompt)
@@ -123,7 +111,12 @@ class PresentationStructureAgent(BaseAgent):
                 arguments=arguments
             )
 
-            response_content = str(response.content) if hasattr(response, 'content') else str(response)
+            if response and isinstance(response, list) and len(response) > 0:
+                last_message = response[-1]
+                response_content = str(last_message.content)
+            else:
+                response_content = str(response)
+
             self.add_assistant_message(response_content)
             
             return self._validate_and_enforce_limits(response_content, extracted_content)
