@@ -1,0 +1,15 @@
+# Azure Functions
+azure-functions
+azure-functions-worker
+
+# Semantic Kernel
+semantic-kernel==1.30.0
+
+# OpenAI
+openai>=1.0.0
+
+# Environment and utilities  
+python-dotenv>=1.0.0
+
+# PDF generation
+reportlab>=4.0.0
