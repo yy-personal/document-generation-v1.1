@@ -62,7 +62,7 @@ class PowerPointOrchestrator:
             "slides", "powerpoint", "ppt", "show", "present", "convert",
             "transform", "turn into", "export", "output",
             "the document", "this document", "the file", "this file",
-            "it", "this", "that", "from this", "based on"
+            "it", "this", "that", "from this", "based on", "proceed"
         ]
         
         user_lower = user_message.lower()
