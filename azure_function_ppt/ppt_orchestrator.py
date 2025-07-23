@@ -23,26 +23,12 @@ class PowerPointOrchestrator:
 
     def _parse_document_extraction(self, user_message: str) -> tuple:
         """Parse user message to extract document content and user input"""
-        # Support both new simplified tag and legacy tags for backward compatibility
+        # Support only the simplified document tag for best quality
         if '[document]' in user_message:
             parts = user_message.split('[document]', 1)
             user_input = parts[0].strip() if parts[0].strip() else None
             document_content = parts[1].strip() if len(parts) > 1 and parts[1].strip() else None
-            # Auto-detect file type from content if needed (not critical for processing)
-            return document_content, user_input, "auto"
-        
-        # Legacy support - keep for backward compatibility
-        elif '[pdf_extraction]' in user_message:
-            parts = user_message.split('[pdf_extraction]', 1)
-            user_input = parts[0].strip() if parts[0].strip() else None
-            document_content = parts[1].strip() if len(parts) > 1 and parts[1].strip() else None
-            return document_content, user_input, "pdf"
-        
-        elif '[word_document_extraction]' in user_message:
-            parts = user_message.split('[word_document_extraction]', 1)
-            user_input = parts[0].strip() if parts[0].strip() else None
-            document_content = parts[1].strip() if len(parts) > 1 and parts[1].strip() else None
-            return document_content, user_input, "word"
+            return document_content, user_input, "document"
         
         return None, user_message, None
 
@@ -52,22 +38,11 @@ class PowerPointOrchestrator:
             if message.get("role") == "user":
                 content = message.get("content", "")
                 
-                # Check for new simplified tag first
+                # Only support the document tag
                 if '[document]' in content:
                     parts = content.split('[document]', 1)
                     if len(parts) > 1 and parts[1].strip():
-                        return parts[1].strip(), "auto"
-                
-                # Legacy support
-                elif '[pdf_extraction]' in content:
-                    parts = content.split('[pdf_extraction]', 1)
-                    if len(parts) > 1 and parts[1].strip():
-                        return parts[1].strip(), "pdf"
-                
-                elif '[word_document_extraction]' in content:
-                    parts = content.split('[word_document_extraction]', 1)
-                    if len(parts) > 1 and parts[1].strip():
-                        return parts[1].strip(), "word"
+                        return parts[1].strip(), "document"
         
         return None, None
 

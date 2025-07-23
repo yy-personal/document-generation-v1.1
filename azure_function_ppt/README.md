@@ -67,10 +67,10 @@ POST /api/powerpoint_generation
 
 ### Request Examples
 
-**Direct Upload:**
+**Document Upload:**
 ```json
 {
-  "user_message": "[word_document_extraction]Functional Specification...",
+  "user_message": "[document]Functional Specification...",
   "entra_id": "user-123"
 }
 ```

@@ -53,16 +53,16 @@ Project Phoenix represents a significant investment in our technological infrast
         
         return self._make_request(test_request, "New Document Tag")
 
-    def test_legacy_tag_compatibility(self):
-        """Test legacy tag still works for backward compatibility"""
-        print("Testing legacy [word_document_extraction] tag...")
+    def test_empty_user_message(self):
+        """Test with empty user message before document"""
+        print("Testing empty user message...")
         
         test_request = {
-            "user_message": f"[word_document_extraction]{self.test_document}",
+            "user_message": f"[document]{self.test_document}",
             "entra_id": "poc-test-user"
         }
         
-        return self._make_request(test_request, "Legacy Tag")
+        return self._make_request(test_request, "Empty User Message")
 
     def test_with_user_instruction(self):
         """Test with user instruction + document"""
@@ -125,8 +125,8 @@ Project Phoenix represents a significant investment in our technological infrast
         
         # Run tests
         tests = [
-            ("Core Functionality (New Tag)", self.test_new_document_tag),
-            ("Backward Compatibility", self.test_legacy_tag_compatibility),
+            ("Core Functionality (Document Tag)", self.test_new_document_tag),
+            ("Empty User Message", self.test_empty_user_message),
             ("User Instructions", self.test_with_user_instruction)
         ]
         
