@@ -1,0 +1,12 @@
+Collecting python-pptx
+  Downloading python_pptx-1.0.2-py3-none-any.whl.metadata (2.5 kB)
+Requirement already satisfied: Pillow>=3.3.2 in c:\users\lim yin yao\appdata\local\programs\python\python312\lib\site-packages (from python-pptx) (11.3.0)
+Collecting XlsxWriter>=0.5.7 (from python-pptx)
+  Downloading xlsxwriter-3.2.5-py3-none-any.whl.metadata (2.7 kB)
+Requirement already satisfied: lxml>=3.1.0 in c:\users\lim yin yao\appdata\local\programs\python\python312\lib\site-packages (from python-pptx) (6.0.0)
+Requirement already satisfied: typing-extensions>=4.9.0 in c:\users\lim yin yao\appdata\local\programs\python\python312\lib\site-packages (from python-pptx) (4.14.0)
+Downloading python_pptx-1.0.2-py3-none-any.whl (472 kB)
+Downloading xlsxwriter-3.2.5-py3-none-any.whl (172 kB)
+Installing collected packages: XlsxWriter, python-pptx
+
+Successfully installed XlsxWriter-3.2.5 python-pptx-1.0.2
