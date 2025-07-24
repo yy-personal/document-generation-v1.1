@@ -34,11 +34,13 @@ class SlideContentGenerator(BaseAgent):
         - **USE ACTUAL DATA**: Include specific details, numbers, dates from the source material
 
         CONTENT GUIDELINES:
-        - **6x6 Rule**: Maximum 6 bullets per slide, concise but specific points
+        - **Quality Over Quantity**: Only create slides with meaningful, substantive content
+        - **Natural Content**: 2-6 bullets per slide based on available information
         - **Clear Language**: Professional but accessible terminology
         - **Action-Oriented**: Use active voice and strong verbs
         - **Source-Driven**: Every bullet point must relate to the actual document content
         - **Consistent Style**: Parallel structure in bullet points
+        - **No Padding**: Skip slides or reduce slide count if content is insufficient
 
         SLIDE CONTENT CREATION PROCESS:
         1. **Analyze Structure**: Understand each slide's purpose and topic
@@ -115,12 +117,14 @@ class SlideContentGenerator(BaseAgent):
             6. **USE MAIN TOPICS**: Reference the main topics to ensure relevance to the source document
             
             CONTENT REQUIREMENTS:
-            - Transform content_outline into professional, presentation-ready bullet points
-            - Maximum 6 bullet points per slide
-            - Use the exact slide titles from the structure
+            - Only create slides where you have meaningful content from the source
+            - 2-6 bullet points per slide (let content richness determine count)
+            - Use the exact slide titles from the structure where content exists  
             - Use the exact slide types (slide_type field) from the structure
-            - Ensure bullet points are concise but informative
-            - Each bullet should be derived from the content_outline provided
+            - Make bullet points substantive but don't artificially expand them
+            - Each bullet should be derived from actual content_outline provided
+            - SKIP SLIDES if the content_outline is too thin or generic
+            - Better to have fewer high-quality slides than many weak ones
             
             OUTPUT: Valid JSON array with slides exactly matching the structure provided.
             Each slide must have: title, content (array of strings), layout (use slide_type value)
@@ -180,13 +184,18 @@ class SlideContentGenerator(BaseAgent):
                 # Use the structure content directly but ensure it's properly formatted
                 content_outline = slide_plan.get("content_outline", [])
                 
-                # If content_outline has good content, use it; otherwise create minimal fallback
-                if content_outline and len(content_outline) > 0 and any(len(str(item).strip()) > 5 for item in content_outline):
-                    content = [str(item) for item in content_outline[:6]]  # Limit to 6 items
+                # Only include slides with substantive content
+                if content_outline and len(content_outline) > 0 and any(len(str(item).strip()) > 10 for item in content_outline):
+                    # Filter out generic or too-short content
+                    quality_content = [str(item) for item in content_outline if len(str(item).strip()) > 10][:6]
+                    if len(quality_content) >= 2:  # Need at least 2 good bullet points
+                        content = quality_content
+                    else:
+                        # Skip this slide - not enough quality content
+                        continue
                 else:
-                    # Create minimal fallback based on slide title
-                    slide_title = slide_plan.get("title", "Content")
-                    content = [f"Key information about {slide_title}", "Supporting details", "Important points"]
+                    # Skip slides with insufficient content rather than creating filler
+                    continue
 
                 slides.append({
                     "title": slide_plan.get("title", "Slide Title"),
