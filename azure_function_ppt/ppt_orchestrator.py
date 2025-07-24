@@ -150,7 +150,8 @@ class PowerPointOrchestrator:
             if not content_generator:
                 return json.dumps(structure_data.get("presentation_structure", []))
                 
-            structure_json = json.dumps(structure_data.get("presentation_structure", []))
+            # Pass the full structure data to SlideContentGenerator, not just the structure array
+            structure_json = json.dumps(structure_data)
             return await content_generator.process(structure_json)
             
         except Exception as e:

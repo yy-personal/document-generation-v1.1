@@ -25,43 +25,44 @@ class SlideContentGenerator(BaseAgent):
         self.service, self.default_execution_settings = get_ai_service(**config)
 
         instructions = """
-        You are a Slide Content Specialist that creates engaging, professional slide content.
+        You are a Slide Content Specialist that creates engaging, professional slide content based STRICTLY on the provided document structure and content.
 
-        GENERATE SLIDE CONTENT:
-        - Clear, concise bullet points
-        - Professional business presentation language
-        - Actionable and meaningful content
-        - Proper formatting for visual presentation
+        CRITICAL REQUIREMENTS:
+        - **STAY TRUE TO SOURCE**: All content must be directly derived from the provided structure
+        - **NO GENERIC CONTENT**: Never create generic business content or placeholder text
+        - **MATCH STRUCTURE**: Follow the exact slide structure and topics provided
+        - **USE ACTUAL DATA**: Include specific details, numbers, dates from the source material
 
         CONTENT GUIDELINES:
-        - **6x6 Rule**: Maximum 6 bullets per slide, 6 words per bullet when possible
+        - **6x6 Rule**: Maximum 6 bullets per slide, concise but specific points
         - **Clear Language**: Professional but accessible terminology
         - **Action-Oriented**: Use active voice and strong verbs
+        - **Source-Driven**: Every bullet point must relate to the actual document content
         - **Consistent Style**: Parallel structure in bullet points
 
-        SLIDE CONTENT FORMAT:
-        For each slide, provide:
-        - Clear, compelling title
-        - Well-formatted bullet points
-        - Appropriate content length for readability
+        SLIDE CONTENT CREATION PROCESS:
+        1. **Analyze Structure**: Understand each slide's purpose and topic
+        2. **Extract Key Info**: Pull relevant details from the source content
+        3. **Format Professionally**: Create clear, engaging bullet points
+        4. **Maintain Accuracy**: Ensure all information is factually correct from source
 
         OUTPUT FORMAT (JSON only, no markdown):
-        Generate slide content in JSON format:
+        Generate slide content in JSON format exactly matching the provided structure:
 
         [
           {
-            "title": "Slide Title",
+            "title": "Exact Title from Structure",
             "content": [
-              "Clear bullet point 1",
-              "Actionable bullet point 2", 
-              "Meaningful bullet point 3"
+              "Specific detail from source",
+              "Another relevant fact from document", 
+              "Action item based on source content"
             ],
-            "layout": "CONTENT_SLIDE"
+            "layout": "SLIDE_TYPE_FROM_STRUCTURE"
           }
         ]
 
-        Focus on creating content that will engage the audience and communicate key messages effectively.
-        Your entire output must be a single, valid JSON array.
+        CRITICAL: Your content must be 100% derived from the provided structure and source material. 
+        Never generate generic business content. Your entire output must be a single, valid JSON array.
         """
 
         self.agent = ChatCompletionAgent(
@@ -71,22 +72,58 @@ class SlideContentGenerator(BaseAgent):
         )
 
     async def process(self, structure: str, context_metadata: Optional[Dict[str, Any]] = None) -> str:
-        """Generate detailed slide content from structure"""
+        """Generate detailed slide content from structure, staying true to source material"""
         try:
+            # Parse the structure to understand what we're working with
+            try:
+                structure_data = json.loads(structure)
+                if "presentation_structure" in structure_data:
+                    # Full structure data received
+                    slide_list = structure_data.get("presentation_structure", [])
+                    content_analysis = structure_data.get("content_analysis", {})
+                    main_topics = content_analysis.get("main_topics", [])
+                else:
+                    # Just the slide array received
+                    slide_list = structure_data if isinstance(structure_data, list) else []
+                    main_topics = []
+            except json.JSONDecodeError as e:
+                print(f"SlideContentGenerator: Failed to parse structure JSON: {e}")
+                return self._fallback_content_generation(structure)
+            
+            if not slide_list:
+                print("SlideContentGenerator: No slides found in structure")
+                return self._fallback_content_generation(structure)
+            
+            print(f"SlideContentGenerator: Processing {len(slide_list)} slides based on topics: {main_topics}")
+            
             content_prompt = f"""
-            SLIDE CONTENT GENERATION:
+            SLIDE CONTENT GENERATION FROM SOURCE MATERIAL:
             
-            PRESENTATION STRUCTURE: "{structure}"
+            You must create slide content based EXCLUSIVELY on the following presentation structure.
+            This structure was created from specific document content - you must honor that content.
             
-            Generate detailed, engaging content for each slide based on the structure provided.
+            MAIN TOPICS IDENTIFIED: {main_topics}
             
-            Requirements for business presentations:
-            - Professional, business-appropriate language
-            - Clear, actionable bullet points (max 6 per slide)
-            - Content optimized for visual presentation
+            PRESENTATION STRUCTURE: {json.dumps(slide_list, indent=2)}
             
-            Create compelling slide content that effectively communicates the key messages.
-            Output in JSON format with a list of slide objects. Each object must contain 'title', 'content' (an array of strings), and 'layout'.
+            CRITICAL INSTRUCTIONS:
+            1. **ANALYZE THE STRUCTURE**: Parse the JSON structure to understand each slide's purpose
+            2. **USE STRUCTURE CONTENT**: Base your content on titles and content_outline provided in the structure
+            3. **EXPAND APPROPRIATELY**: Take the outline points and expand them into professional bullet points
+            4. **MAINTAIN ACCURACY**: Keep all facts, numbers, dates, and details from the original structure
+            5. **NO INVENTION**: Do not add generic business content or create new information
+            6. **USE MAIN TOPICS**: Reference the main topics to ensure relevance to the source document
+            
+            CONTENT REQUIREMENTS:
+            - Transform content_outline into professional, presentation-ready bullet points
+            - Maximum 6 bullet points per slide
+            - Use the exact slide titles from the structure
+            - Use the exact slide types (slide_type field) from the structure
+            - Ensure bullet points are concise but informative
+            - Each bullet should be derived from the content_outline provided
+            
+            OUTPUT: Valid JSON array with slides exactly matching the structure provided.
+            Each slide must have: title, content (array of strings), layout (use slide_type value)
             """
             
             self.add_user_message(content_prompt)
@@ -109,41 +146,68 @@ class SlideContentGenerator(BaseAgent):
             else:
                 response_content = str(response)
 
-            self.add_assistant_message(response_content)
-            
-            return response_content
+            # Clean up markdown formatting if present
+            if response_content.startswith('```json'):
+                response_content = response_content.replace('```json', '').replace('```', '').strip()
+
+            # Validate that we got valid JSON
+            try:
+                parsed_response = json.loads(response_content)
+                if isinstance(parsed_response, list) and len(parsed_response) > 0:
+                    print(f"SlideContentGenerator: Successfully generated {len(parsed_response)} slides with AI")
+                    self.add_assistant_message(response_content)
+                    return response_content
+                else:
+                    print(f"SlideContentGenerator: Invalid AI response format, using fallback")
+                    return self._fallback_content_generation(structure)
+            except json.JSONDecodeError as e:
+                print(f"SlideContentGenerator: AI response not valid JSON ({e}), using fallback")
+                return self._fallback_content_generation(structure)
 
         except Exception as e:
             print(f"Content generation error: {str(e)}")
             return self._fallback_content_generation(structure)
 
     def _fallback_content_generation(self, structure: str) -> str:
-        """Simple fallback content generation"""
+        """Fallback content generation that preserves source structure"""
         slides = []
         try:
+            # Try to parse as JSON structure first
             structure_data = json.loads(structure)
             slide_list = structure_data.get("presentation_structure", [])
 
             for slide_plan in slide_list:
+                # Use the structure content directly but ensure it's properly formatted
+                content_outline = slide_plan.get("content_outline", [])
+                
+                # If content_outline has good content, use it; otherwise create minimal fallback
+                if content_outline and len(content_outline) > 0 and any(len(str(item).strip()) > 5 for item in content_outline):
+                    content = [str(item) for item in content_outline[:6]]  # Limit to 6 items
+                else:
+                    # Create minimal fallback based on slide title
+                    slide_title = slide_plan.get("title", "Content")
+                    content = [f"Key information about {slide_title}", "Supporting details", "Important points"]
+
                 slides.append({
-                    "title": slide_plan.get("title", "Fallback Title"),
-                    "content": slide_plan.get("content_outline", ["Fallback content."]),
+                    "title": slide_plan.get("title", "Slide Title"),
+                    "content": content,
                     "layout": slide_plan.get("slide_type", "CONTENT_SLIDE")
                 })
+                
+            print(f"SlideContentGenerator: Using fallback generation for {len(slides)} slides")
             
-            if not slides: # If parsing fails, use old method
+            if not slides:
                 raise ValueError("Could not parse structure")
 
         except (json.JSONDecodeError, ValueError):
-             # This is a less reliable fallback, kept for safety
-            slide_sections = structure.split('## Slide')
-            for i, section in enumerate(slide_sections[1:], 1):
-                lines = section.strip().split('\n')
-                title_line = lines[0] if lines else f"Slide {i}"
-                title = title_line.split(':', 1)[1].strip() if ':' in title_line else title_line.strip()
-                content_points = [line.strip()[2:] for line in lines if line.strip().startswith('- ')]
-                if not content_points: content_points = [f"Content for slide {i}"]
-                layout = "TITLE_SLIDE" if i == 1 else "CONTENT_SLIDE"
-                slides.append({"title": title, "content": content_points[:6], "layout": layout})
+            # Last resort fallback - create basic slides
+            print("Warning: Using basic fallback for slide content generation")
+            slides = [
+                {
+                    "title": "Presentation Overview",
+                    "content": ["Content could not be generated", "Please check source document", "Manual review needed"],
+                    "layout": "TITLE_SLIDE"
+                }
+            ]
 
         return json.dumps(slides, indent=2)

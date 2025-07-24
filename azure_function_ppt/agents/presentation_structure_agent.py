@@ -128,14 +128,29 @@ class PresentationStructureAgent(BaseAgent):
             analysis_prompt = f"""
             CONTENT ANALYSIS & STRUCTURE CREATION:
             
-            EXTRACTED CONTENT: "{extracted_content[:2500]}..."
+            EXTRACTED CONTENT TO ANALYZE: {extracted_content[:4000]}
             
-            Analyze this content and create an optimal presentation structure.
-            1. Analyze content to identify main topics and complexity.
-            2. Determine the optimal number of slides (between {PRESENTATION_CONFIG['min_slides']} and {get_max_slides()}).
-            3. Create a detailed slide-by-slide outline in the specified JSON format.
+            CRITICAL REQUIREMENTS:
+            1. **ANALYZE THE ACTUAL CONTENT**: Base your analysis on the specific content provided above
+            2. **EXTRACT REAL TOPICS**: Identify the actual topics, projects, data, and key points from the content
+            3. **CREATE RELEVANT STRUCTURE**: Build slides that directly relate to the content provided
+            4. **USE SPECIFIC DETAILS**: Include actual names, dates, numbers, and facts from the content
+            5. **NO GENERIC CONTENT**: Avoid generic business presentation topics unless they're actually in the content
             
-            Focus on creating a compelling narrative flow.
+            CONTENT ANALYSIS STEPS:
+            1. Identify the main subject/project/topic from the content
+            2. Extract key objectives, goals, or main points
+            3. Find specific details like timelines, metrics, phases, etc.
+            4. Determine optimal slide count based on content density
+            5. Create slide-by-slide structure with content-specific titles and outlines
+            
+            SLIDE STRUCTURE REQUIREMENTS:
+            - Use specific titles that reflect the actual content (not generic ones)
+            - Include specific details in content_outline (dates, numbers, names, etc.)
+            - Create a logical flow that tells the story of the actual document
+            - Ensure each slide serves a purpose in presenting the real content
+            
+            Create a detailed slide-by-slide outline in the specified JSON format based on the ACTUAL content provided.
             """
             
             self.add_user_message(analysis_prompt)
