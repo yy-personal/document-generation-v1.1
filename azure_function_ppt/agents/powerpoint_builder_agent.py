@@ -4,12 +4,14 @@ PowerPoint Builder Agent - With template support
 from pptx import Presentation
 from pptx.util import Pt, Inches
 from pptx.dml.color import RGBColor
+from pptx.enum.text import PP_ALIGN
 from typing import Dict, Any, Optional
 from agents.core.base_agent import BaseAgent
 from config import get_template_path
 import json
 import io
 import os
+import re
 
 class PowerPointBuilderAgent(BaseAgent):
     """Builds PowerPoint files with 16:9 aspect ratio and simple 2-color theme"""
@@ -280,14 +282,32 @@ class PowerPointBuilderAgent(BaseAgent):
             print("No content placeholder found for standout slide")
 
     def _format_any_slide_content(self, slide, content, slide_type):
-        """SIMPLIFIED: Format any slide content with dynamic font sizing"""
+        """SIMPLIFIED: Format any slide content with table detection and smart formatting"""
         content_placeholder = self._find_content_placeholder(slide)
         
         if content_placeholder and content:
             try:
                 content_list = content if isinstance(content, list) else [content]
                 
-                # Smart content formatting - let PowerPoint handle bullets
+                # Check if content should be a table
+                table_info = self._detect_table_content(content_list)
+                
+                if table_info["is_table"]:
+                    # Remove the content placeholder and create a table instead
+                    try:
+                        slide.shapes._spTree.remove(content_placeholder._element)
+                        print(f"Removed text placeholder to create table")
+                    except:
+                        print("Could not remove placeholder, creating table anyway")
+                    
+                    # Create table
+                    if self._create_table_slide(slide, table_info):
+                        print(f"Successfully created table for {slide_type}")
+                        return
+                    else:
+                        print(f"Table creation failed, falling back to text for {slide_type}")
+                
+                # Standard text formatting (not a table)
                 if len(content_list) == 1:
                     # Single item - could be paragraph or single point
                     content_placeholder.text = str(content_list[0])
@@ -441,6 +461,111 @@ class PowerPointBuilderAgent(BaseAgent):
             
         except Exception as e:
             print(f"Error applying smart text formatting: {e}")
+
+    def _detect_table_content(self, content_list: list) -> dict:
+        """Detect if content should be presented as a table"""
+        if not content_list or len(content_list) < 2:
+            return {"is_table": False}
+        
+        # Look for patterns that suggest tabular data
+        table_patterns = [
+            r'\w+\s*:\s*\$[\d,]+',      # Item: $amount
+            r'\w+\s*:\s*\d+\.?\d*%',    # Item: percentage  
+            r'\w+\s*:\s*\d+',           # Item: number
+            r'[A-Z][^:]*:\s*.+',        # Category: description
+        ]
+        
+        matches = 0
+        for item in content_list[:6]:  # Check first 6 items
+            item_str = str(item)
+            for pattern in table_patterns:
+                if re.search(pattern, item_str):
+                    matches += 1
+                    break
+        
+        # If 50%+ of items match table patterns, create a table
+        if matches >= len(content_list) * 0.5 and matches >= 2:
+            table_data = self._parse_table_data(content_list)
+            return {
+                "is_table": True,
+                "rows": len(table_data),
+                "cols": 2,  # Most common: label/value pairs
+                "data": table_data
+            }
+        
+        return {"is_table": False}
+
+    def _parse_table_data(self, content_list: list) -> list:
+        """Parse content into table rows"""
+        table_data = []
+        
+        for item in content_list:
+            item_str = str(item).strip()
+            
+            # Split on colon for key:value pairs
+            if ':' in item_str:
+                parts = item_str.split(':', 1)
+                if len(parts) == 2:
+                    table_data.append([parts[0].strip(), parts[1].strip()])
+                else:
+                    table_data.append([item_str, ""])
+            else:
+                # If no colon, put entire text in first column
+                table_data.append([item_str, ""])
+        
+        return table_data[:8]  # Limit to 8 rows for readability
+
+    def _create_table_slide(self, slide, table_info: dict):
+        """Create a table on the slide"""
+        try:
+            rows = table_info["rows"]
+            cols = table_info["cols"] 
+            data = table_info["data"]
+            
+            # Position table in the content area
+            left = Inches(1)
+            top = Inches(2) 
+            width = Inches(14)  # 16:9 slide width minus margins
+            height = Inches(5)
+            
+            # Add table shape
+            table_shape = slide.shapes.add_table(rows, cols, left, top, width, height)
+            table = table_shape.table
+            
+            # Set column widths for better layout
+            table.columns[0].width = Inches(6)   # First column (labels)
+            table.columns[1].width = Inches(8)   # Second column (values)
+            
+            # Fill table with data
+            for row_idx, row_data in enumerate(data):
+                if row_idx >= rows:
+                    break
+                    
+                for col_idx, cell_value in enumerate(row_data):
+                    if col_idx >= cols:
+                        break
+                        
+                    cell = table.cell(row_idx, col_idx)
+                    cell.text = str(cell_value)
+                    
+                    # Format cell text
+                    paragraph = cell.text_frame.paragraphs[0]
+                    paragraph.alignment = PP_ALIGN.LEFT
+                    
+                    for run in paragraph.runs:
+                        run.font.name = 'Calibri'
+                        run.font.size = Pt(18)
+                        
+                        # Make first column bold (labels)
+                        if col_idx == 0:
+                            run.font.bold = True
+            
+            print(f"Created table with {rows} rows and {cols} columns")
+            return True
+            
+        except Exception as e:
+            print(f"Error creating table: {e}")
+            return False
 
     def _apply_content_format(self, paragraph):
         """Apply minimal content formatting - preserve template fonts"""

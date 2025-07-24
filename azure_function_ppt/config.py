@@ -61,7 +61,11 @@ SLIDE_LAYOUTS = {
     "RECOMMENDATIONS_SLIDE": "Recommendations and action items",
     "NEXT_STEPS_SLIDE": "Next steps and follow-up actions",
     "SUMMARY_SLIDE": "Key takeaways and conclusions (3-6 points)",
-    "THANK_YOU_SLIDE": "Contact information and next steps"
+    "THANK_YOU_SLIDE": "Contact information and next steps",
+    # New layout types for enhanced presentations
+    "TABLE_SLIDE": "Data presented in table format with clean formatting",
+    "COMPARISON_SLIDE": "Side-by-side comparison layout",
+    "TWO_COLUMN_SLIDE": "Two-column layout for organized content"
 }
 
 # ====================================================================
@@ -129,17 +133,19 @@ def get_outline_structure(available_slides: int) -> list:
 
 MANDATORY_START_AGENTS = ["SmartPresentationProcessor"]
 CONTENT_PROCESSORS = [
-    "DocumentContentExtractor", 
+    "DocumentContentExtractor",
+    "DesignPlanningAgent", 
     "PresentationStructureAgent", 
     "SlideContentGenerator"
 ]
 FILE_GENERATOR = ["PowerPointBuilderAgent"]
 
 def get_complete_pipeline() -> list:
-    """Get complete PowerPoint generation pipeline"""
+    """Get complete PowerPoint generation pipeline with design planning"""
     return [
         "SmartPresentationProcessor",
-        "DocumentContentExtractor", 
+        "DocumentContentExtractor",
+        "DesignPlanningAgent",
         "PresentationStructureAgent",
         "SlideContentGenerator",
         "PowerPointBuilderAgent"
@@ -164,6 +170,13 @@ DEFAULT_AGENT_CONFIGS = {
     # Content organization only
     "DocumentContentExtractor": {
         "max_tokens": 8000,
+        "temperature": 0.4,
+        "top_p": 0.9
+    },
+    
+    # Visual design strategy and planning
+    "DesignPlanningAgent": {
+        "max_tokens": 6000,
         "temperature": 0.4,
         "top_p": 0.9
     },
