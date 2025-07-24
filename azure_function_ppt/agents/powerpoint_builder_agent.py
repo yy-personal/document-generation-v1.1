@@ -272,14 +272,14 @@ class PowerPointBuilderAgent(BaseAgent):
             try:
                 content_list = content if isinstance(content, list) else [content]
                 
-                # Simple text assignment - preserve ALL template formatting
+                # Smart content formatting - let PowerPoint handle bullets
                 if len(content_list) == 1:
-                    # Single item - set as plain text
+                    # Single item - could be paragraph or single point
                     content_placeholder.text = str(content_list[0])
                 else:
-                    # Multiple items - join with bullet points
-                    bullet_content = '\n'.join([f"• {item}" for item in content_list[:6]])
-                    content_placeholder.text = bullet_content
+                    # Multiple items - DON'T add manual bullets, let PowerPoint's template handle it
+                    content_text = '\n'.join([str(item) for item in content_list[:6]])
+                    content_placeholder.text = content_text
                     
                 print(f"Successfully set content for {slide_type}: {len(content_list)} items")
                 

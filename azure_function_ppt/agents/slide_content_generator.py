@@ -55,11 +55,18 @@ class SlideContentGenerator(BaseAgent):
           {
             "title": "Exact Title from Structure",
             "content": [
-              "Specific detail from source",
-              "Another relevant fact from document", 
-              "Action item based on source content"
+              "Content item 1 (no manual bullets - PowerPoint handles this)",
+              "Content item 2 (for multiple points)", 
+              "Content item 3 (when appropriate)"
             ],
             "layout": "SLIDE_TYPE_FROM_STRUCTURE"
+          },
+          {
+            "title": "Overview Example",
+            "content": [
+              "This project represents a comprehensive modernization effort designed to enhance our core technology platform and improve user experience across all digital touchpoints."
+            ],
+            "layout": "OVERVIEW_SLIDE"
           }
         ]
 
@@ -118,13 +125,22 @@ class SlideContentGenerator(BaseAgent):
             
             CONTENT REQUIREMENTS:
             - Only create slides where you have meaningful content from the source
-            - 2-6 bullet points per slide (let content richness determine count)
+            - Use appropriate content format based on slide type and content nature:
+              * BULLET FORMAT: For lists, key points, multiple items (2-6 items)
+              * PARAGRAPH FORMAT: For explanations, descriptions, single concepts
             - Use the exact slide titles from the structure where content exists  
             - Use the exact slide types (slide_type field) from the structure
-            - Make bullet points substantive but don't artificially expand them
-            - Each bullet should be derived from actual content_outline provided
+            - Make content substantive but don't artificially expand it
+            - Each item should be derived from actual content_outline provided
             - SKIP SLIDES if the content_outline is too thin or generic
             - Better to have fewer high-quality slides than many weak ones
+            
+            FORMATTING GUIDELINES:
+            - Title slides: Use paragraph format for subtitle/description
+            - Overview slides: Use paragraph format for narrative explanation
+            - Analysis/Process slides: Use bullet format for multiple points
+            - Conclusion/Summary: Use bullet format for key takeaways
+            - DON'T add manual bullet symbols (•) - PowerPoint will handle bullets automatically
             
             OUTPUT: Valid JSON array with slides exactly matching the structure provided.
             Each slide must have: title, content (array of strings), layout (use slide_type value)
