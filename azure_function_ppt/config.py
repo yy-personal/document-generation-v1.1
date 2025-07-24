@@ -52,12 +52,14 @@ PRESENTATION_CONFIG = {
 SLIDE_LAYOUTS = {
     "TITLE_SLIDE": "Company logo, title, subtitle, presenter info",
     "AGENDA_SLIDE": "Overview of presentation topics (3-8 items)",
-    "INTRODUCTION_SLIDE": "Introduction and context setting",
+    "OVERVIEW_SLIDE": "High-level overview and context setting",
     "CONTENT_SLIDE": "Standard content with title and bullet points",
-    "KEY_INSIGHT_SLIDE": "Key insights and important findings",
-    "TWO_COLUMN_SLIDE": "Comparative content, before/after, pros/cons",
+    "ANALYSIS_SLIDE": "Analysis, findings, and observations",
+    "OBJECTIVES_SLIDE": "Goals, objectives, and targets",
+    "PROCESS_SLIDE": "Steps, workflow, and methodology",
+    "RESULTS_SLIDE": "Outcomes, results, and achievements",
     "RECOMMENDATIONS_SLIDE": "Recommendations and action items",
-    "CONCLUSION_SLIDE": "Conclusions and final thoughts",
+    "NEXT_STEPS_SLIDE": "Next steps and follow-up actions",
     "SUMMARY_SLIDE": "Key takeaways and conclusions (3-6 points)",
     "THANK_YOU_SLIDE": "Contact information and next steps"
 }
@@ -70,10 +72,11 @@ SLIDE_LAYOUTS = {
 STANDARD_OUTLINE = [
     {"type": "TITLE_SLIDE", "title": "Title", "required": True},
     {"type": "AGENDA_SLIDE", "title": "Agenda", "required": True},
-    {"type": "INTRODUCTION_SLIDE", "title": "Introduction", "required": True},
-    {"type": "KEY_INSIGHT_SLIDE", "title": "Key Insight", "required": False, "repeatable": True},
+    {"type": "OVERVIEW_SLIDE", "title": "Overview", "required": True},
+    {"type": "ANALYSIS_SLIDE", "title": "Analysis", "required": False, "repeatable": True},
+    {"type": "OBJECTIVES_SLIDE", "title": "Objectives", "required": False, "repeatable": True},
     {"type": "RECOMMENDATIONS_SLIDE", "title": "Recommendations", "required": True},
-    {"type": "CONCLUSION_SLIDE", "title": "Conclusion", "required": True},
+    {"type": "SUMMARY_SLIDE", "title": "Summary", "required": True},
     {"type": "THANK_YOU_SLIDE", "title": "Thank You", "required": True}
 ]
 
@@ -86,36 +89,35 @@ def get_outline_structure(available_slides: int) -> list:
     min_slides = PRESENTATION_CONFIG["min_slides"]
     available_slides = max(available_slides, min_slides)
     
-    if available_slides < 7:
+    if available_slides < 6:
         # Minimal outline for very short presentations
         return [
             {"type": "TITLE_SLIDE", "title": "Title"},
-            {"type": "INTRODUCTION_SLIDE", "title": "Introduction"},
-            {"type": "KEY_INSIGHT_SLIDE", "title": "Key Insights"},
+            {"type": "OVERVIEW_SLIDE", "title": "Overview"},
+            {"type": "ANALYSIS_SLIDE", "title": "Analysis"},
             {"type": "RECOMMENDATIONS_SLIDE", "title": "Recommendations"},
             {"type": "THANK_YOU_SLIDE", "title": "Thank You"}
         ][:available_slides]
     
-    # Standard structure with flexible Key Insight slots
-    required_slides = 6  # Title, Agenda, Introduction, Recommendations, Conclusion, Thank You
-    key_insight_slots = max(1, available_slides - required_slides)
+    # Standard structure with flexible content slots
+    required_slides = 5  # Title, Agenda, Overview, Recommendations, Thank You
+    content_slots = max(1, available_slides - required_slides)
     
     outline = [
         {"type": "TITLE_SLIDE", "title": "Title"},
         {"type": "AGENDA_SLIDE", "title": "Agenda"},
-        {"type": "INTRODUCTION_SLIDE", "title": "Introduction"}
+        {"type": "OVERVIEW_SLIDE", "title": "Overview"}
     ]
     
-    # Add Key Insight slides
-    for i in range(key_insight_slots):
-        if i == 0:
-            outline.append({"type": "KEY_INSIGHT_SLIDE", "title": "Key Insight #1"})
-        else:
-            outline.append({"type": "KEY_INSIGHT_SLIDE", "title": f"Key Insight #{i+1}"})
+    # Add flexible content slides (Analysis, Objectives, Process, Results)
+    content_types = ["ANALYSIS_SLIDE", "OBJECTIVES_SLIDE", "PROCESS_SLIDE", "RESULTS_SLIDE"]
+    for i in range(content_slots):
+        slide_type = content_types[i % len(content_types)]
+        slide_title = slide_type.replace("_SLIDE", "").title()
+        outline.append({"type": slide_type, "title": slide_title})
     
     outline.extend([
         {"type": "RECOMMENDATIONS_SLIDE", "title": "Recommendations"},
-        {"type": "CONCLUSION_SLIDE", "title": "Conclusion"},
         {"type": "THANK_YOU_SLIDE", "title": "Thank You"}
     ])
     
