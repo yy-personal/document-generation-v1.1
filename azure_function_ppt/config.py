@@ -216,7 +216,7 @@ SESSION_ID_UNIQUE_LENGTH = 8
 # ====================================================================
 
 TEMPLATE_CONFIG = {
-    "use_templates": False,  # Set to False to disable all custom templates
+    "use_templates": False,  # Set to False to disable custom templates
     "default_template": "templates/default_template.pptx",
     "company_template": "templates/company_template.pptx", 
     "executive_template": "templates/executive_template.pptx",

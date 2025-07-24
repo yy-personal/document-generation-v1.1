@@ -48,12 +48,13 @@ class PowerPointBuilderAgent(BaseAgent):
             if template_path:
                 print(f"Using template: {template_path}")
                 prs = Presentation(template_path)
+                print(f"Template dimensions: {prs.slide_width.inches:.1f}\" x {prs.slide_height.inches:.1f}\"")
+                # Don't override template aspect ratio - respect template design
             else:
                 print("Using python-pptx default template (no custom design)")
                 prs = Presentation()
-            
-            # Always set to 16:9 aspect ratio
-            self._set_16_9_aspect_ratio(prs)
+                # Only set 16:9 when not using custom template
+                self._set_16_9_aspect_ratio(prs)
             
             for slide_info in slides_data:
                 self._create_slide(prs, slide_info)
@@ -71,9 +72,9 @@ class PowerPointBuilderAgent(BaseAgent):
                 print("Template failed, falling back to default")
                 try:
                     slides_data = self._parse_slide_content(slide_content)
-                    prs = Presentation()  # Use default
+                    prs = Presentation()  # Use python-pptx default
                     
-                    # Always set to 16:9 aspect ratio
+                    # Set to 16:9 aspect ratio for fallback
                     self._set_16_9_aspect_ratio(prs)
                     
                     for slide_info in slides_data:
