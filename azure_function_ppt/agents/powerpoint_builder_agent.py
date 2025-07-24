@@ -35,13 +35,13 @@ class PowerPointBuilderAgent(BaseAgent):
         try:
             slides_data = self._parse_slide_content(slide_content)
             
-            # Use template if available
+            # Use template if available (controlled by config.py)
             template_path = get_template_path("default")
             if template_path:
                 print(f"Using template: {template_path}")
                 prs = Presentation(template_path)
             else:
-                print("Using python-pptx default template")
+                print("Using python-pptx default template (no custom design)")
                 prs = Presentation()
             
             for slide_info in slides_data:
@@ -160,64 +160,49 @@ class PowerPointBuilderAgent(BaseAgent):
             raise e
 
     def _get_layout_index(self, slide_type: str, prs: Presentation) -> int:
-        """Get appropriate layout index based on slide type and template structure"""
-        # Template structure mapping (default_template.pptx):
-        # Layout 0: Presentation title, date time (slide 1)
-        # Layout 1: Presentation title, date time duplicate (slide 2) 
-        # Layout 2: Agenda, divider title (slide 3)
-        # Layout 3: Stand out message (slide 4)
-        # Layout 4: Content slide - side by side, 2-4 rows (slide 5)
-        # Layout 5: Content slide - side by side, 2-4 rows (slide 6)
-        # Layout 6: Content slide - side by side, 2-4 rows (slide 7)
-        # Layout 7: NCS Singapore ending slide (slide 8)
-        
-        layout_mapping = {
-            "TITLE_SLIDE": 0,           # Use template's title layout
-            "AGENDA_SLIDE": 2,          # Use template's agenda layout
-            "INTRODUCTION_SLIDE": 3,    # Use template's stand out message layout
-            "KEY_INSIGHT_SLIDE": 4,     # Use template's content layouts (4-6)
-            "RECOMMENDATIONS_SLIDE": 5, # Use template's content layouts
-            "CONCLUSION_SLIDE": 6,      # Use template's content layouts
-            "THANK_YOU_SLIDE": 7,       # Use template's NCS ending layout
-            "CONTENT_SLIDE": 4,         # Default to first content layout
-            "TWO_COLUMN_SLIDE": 4,      # Use content layout (side-by-side design)
-            "SUMMARY_SLIDE": 5,         # Use content layout
-            "STANDOUT_SLIDE": 3         # Use stand out message layout
-        }
-        
-        layout_index = layout_mapping.get(slide_type, 4)  # Default to content layout
-        
-        # Fallback if layout doesn't exist in template
+        """Get appropriate layout index - SIMPLE 3-LAYOUT SYSTEM"""
         max_layouts = len(prs.slide_layouts)
+        print(f"Template has {max_layouts} layouts available")
+        
+        # SIMPLE 3-LAYOUT SYSTEM:
+        # Layout 0: Opening slide (title/intro) - used once
+        # Layout 1: Content slide (standard) - used for most slides
+        # Layout 2: Ending slide (thank you/NCS) - used once
+        
+        if slide_type == "TITLE_SLIDE":
+            layout_index = 0  # Opening slide
+        elif slide_type == "THANK_YOU_SLIDE":
+            layout_index = 2  # Ending slide
+        else:
+            layout_index = 1  # Content slide for everything else
+        
+        # Fallback if layout doesn't exist
         if layout_index >= max_layouts:
-            # Cycle through available content layouts (4-6) or fallback to layout 1
-            if max_layouts > 4:
-                layout_index = 4 + (layout_index % 3)  # Rotate between layouts 4,5,6
-            else:
-                layout_index = min(1, max_layouts - 1)
+            print(f"Warning: Layout {layout_index} not available, using layout 0")
+            layout_index = 0
             
+        print(f"Using layout {layout_index} for slide type {slide_type}")
         return layout_index
 
     def _format_slide_by_type(self, slide, slide_type: str, title: str, content):
         """Apply type-specific formatting to slide"""
         try:
-            # Set title
+            # Set title - DON'T apply custom formatting, use template's formatting
             if slide.shapes.title:
+                print(f"Found title shape, setting to: {title}")
                 slide.shapes.title.text = title
-                self._apply_title_format_by_type(slide.shapes.title, slide_type)
+                print(f"Successfully set slide title: {title}")
+                # Remove custom formatting to preserve template fonts
+                # self._apply_title_format_by_type(slide.shapes.title, slide_type)  # REMOVED
+            else:
+                print(f"No title shape found for slide with title: {title}")
         except Exception as e:
-            print(f"Error setting title: {e}")
+            print(f"Error setting title '{title}': {e}")
         
         try:
-            # Add content based on slide type
-            if slide_type == "TITLE_SLIDE":
-                self._format_title_slide(slide, content)
-            elif slide_type == "THANK_YOU_SLIDE":
-                self._format_ncs_ending_slide(slide, content)
-            elif slide_type == "STANDOUT_SLIDE":
-                self._format_standout_slide(slide, content)
-            else:
-                self._format_content_slide(slide, content)
+            # SIMPLIFIED: Use the same content formatting for all slide types
+            # Only the layout (0, 1, or 2) determines the visual design
+            self._format_any_slide_content(slide, content, slide_type)
         except Exception as e:
             print(f"Error formatting slide content for type {slide_type}: {e}")
             # Just leave the slide as-is if formatting fails
@@ -236,77 +221,79 @@ class PowerPointBuilderAgent(BaseAgent):
             print("No subtitle placeholder found for title slide")
 
     def _format_ncs_ending_slide(self, slide, content):
-        """Format NCS Singapore ending slide with company branding"""
+        """Format NCS Singapore ending slide - preserve template design"""
         content_placeholder = self._find_content_placeholder(slide)
-        if content_placeholder and content_placeholder.has_text_frame:
-            text_frame = content_placeholder.text_frame
-            text_frame.clear()
-            
-            # NCS Singapore specific content
-            ncs_content = content if content else [
-                "Thank you for your attention",
-                "NCS Singapore",
-                "Leading Digital Transformation",
-                "Questions & Discussion"
-            ]
-            
-            content_list = ncs_content if isinstance(ncs_content, list) else [ncs_content]
-            
-            for i, item in enumerate(content_list[:4]):
-                p = text_frame.paragraphs[0] if i == 0 else text_frame.add_paragraph()
-                p.text = str(item)
-                self._apply_content_format(p)
-
-    def _format_standout_slide(self, slide, content):
-        """Format stand out message slide"""
-        content_placeholder = self._find_content_placeholder(slide)
-        if content_placeholder and content_placeholder.has_text_frame:
-            text_frame = content_placeholder.text_frame
-            text_frame.clear()
-            
-            # Format as prominent message
-            standout_content = content if content else ["Key Message or Insight"]
-            content_list = standout_content if isinstance(standout_content, list) else [standout_content]
-            
-            for i, item in enumerate(content_list[:2]):  # Max 2 items for standout
-                p = text_frame.paragraphs[0] if i == 0 else text_frame.add_paragraph()
-                p.text = str(item)
-                # Apply larger formatting for standout messages
-                for run in p.runs:
-                    font = run.font
-                    font.name = 'Calibri'
-                    font.size = Pt(24)  # Larger than regular content
-                    font.bold = True
-                    font.color.rgb = self.PRIMARY_COLOR
-
-    def _format_content_slide(self, slide, content):
-        """Format regular content slide with bullets"""
-        content_placeholder = self._find_content_placeholder(slide)
-        if content_placeholder and content:
+        if content_placeholder:
             try:
-                text_frame = content_placeholder.text_frame
-                text_frame.clear()
+                # NCS Singapore specific content
+                ncs_content = content if content else [
+                    "Thank you for your attention",
+                    "NCS Singapore", 
+                    "Leading Digital Transformation",
+                    "Questions & Discussion"
+                ]
                 
-                content_list = content if isinstance(content, list) else [content]
+                content_list = ncs_content if isinstance(ncs_content, list) else [ncs_content]
                 
-                for i, item in enumerate(content_list[:6]):  # Max 6 items
-                    p = text_frame.paragraphs[0] if i == 0 else text_frame.add_paragraph()
-                    p.text = str(item)
-                    self._apply_content_format(p)
-                    
-                print(f"Successfully added {len(content_list)} content items to slide")
+                # Simple text assignment - preserve template formatting
+                ending_text = '\n'.join(content_list[:4])
+                content_placeholder.text = ending_text
+                print(f"Set NCS ending slide content")
                 
             except Exception as e:
-                print(f"Error formatting content slide: {e}")
-                # Fallback: try to add content as simple text
-                try:
-                    content_text = '\n'.join(content_list) if isinstance(content, list) else str(content)
-                    content_placeholder.text = content_text
-                    print("Used fallback text setting")
-                except Exception as e2:
-                    print(f"Fallback also failed: {e2}")
+                print(f"Error setting NCS ending content: {e}")
         else:
-            print(f"No content placeholder found or no content provided. Placeholder: {content_placeholder}, Content: {bool(content)}")
+            print("No content placeholder found for NCS ending slide")
+
+    def _format_standout_slide(self, slide, content):
+        """Format stand out message slide - preserve template design"""
+        content_placeholder = self._find_content_placeholder(slide)
+        if content_placeholder:
+            try:
+                # Format as prominent message
+                standout_content = content if content else ["Key Message or Insight"]
+                content_list = standout_content if isinstance(standout_content, list) else [standout_content]
+                
+                # Simple text assignment - let template handle the formatting
+                standout_text = '\n'.join(content_list[:2])  # Max 2 items for standout
+                content_placeholder.text = standout_text
+                print(f"Set standout slide content")
+                
+            except Exception as e:
+                print(f"Error setting standout content: {e}")
+        else:
+            print("No content placeholder found for standout slide")
+
+    def _format_any_slide_content(self, slide, content, slide_type):
+        """SIMPLIFIED: Format any slide content - let template handle design"""
+        content_placeholder = self._find_content_placeholder(slide)
+        
+        if content_placeholder and content:
+            try:
+                content_list = content if isinstance(content, list) else [content]
+                
+                # Simple text assignment - preserve ALL template formatting
+                if len(content_list) == 1:
+                    # Single item - set as plain text
+                    content_placeholder.text = str(content_list[0])
+                else:
+                    # Multiple items - join with bullet points
+                    bullet_content = '\n'.join([f"• {item}" for item in content_list[:6]])
+                    content_placeholder.text = bullet_content
+                    
+                print(f"Successfully set content for {slide_type}: {len(content_list)} items")
+                
+            except Exception as e:
+                print(f"Error setting {slide_type} content: {e}")
+                # Ultimate fallback
+                try:
+                    simple_text = str(content[0]) if isinstance(content, list) and content else str(content)
+                    content_placeholder.text = simple_text
+                    print("Used simple text fallback")
+                except Exception as e2:
+                    print(f"All methods failed for {slide_type}: {e2}")
+        else:
+            print(f"No content placeholder or content for {slide_type}. Placeholder: {bool(content_placeholder)}, Content: {bool(content)}")
 
     def _apply_title_format_by_type(self, title_shape, slide_type: str):
         """Apply title formatting based on slide type"""
@@ -327,22 +314,24 @@ class PowerPointBuilderAgent(BaseAgent):
 
 
     def _find_content_placeholder(self, slide):
-        """Find the content placeholder in a slide (handles varying template structures)"""
+        """Find the content placeholder in a slide (NOT the title placeholder)"""
         print(f"Looking for content placeholder in slide with {len(slide.placeholders)} placeholders")
         
         # First, let's inspect what placeholders we actually have
         for i, placeholder in enumerate(slide.placeholders):
             try:
                 has_text_frame = hasattr(placeholder, 'has_text_frame') and placeholder.has_text_frame
-                print(f"Placeholder {i}: has_text_frame={has_text_frame}")
+                is_title = placeholder == slide.shapes.title
+                print(f"Placeholder {i}: has_text_frame={has_text_frame}, is_title={is_title}")
             except Exception as e:
                 print(f"Placeholder {i}: Error checking - {e}")
         
-        # Try to find a working content placeholder
+        # Try to find a content placeholder (NOT the title)
         for i, placeholder in enumerate(slide.placeholders):
             try:
-                # Skip title placeholder (usually index 0)
-                if i == 0 and slide.shapes.title and placeholder == slide.shapes.title:
+                # CRITICALLY IMPORTANT: Skip the title placeholder completely
+                if slide.shapes.title and placeholder == slide.shapes.title:
+                    print(f"Skipping placeholder {i} (it's the title placeholder)")
                     continue
                     
                 # Check if this placeholder can hold text
@@ -360,10 +349,8 @@ class PowerPointBuilderAgent(BaseAgent):
         return None
 
     def _apply_content_format(self, paragraph):
-        """Apply content formatting"""
+        """Apply minimal content formatting - preserve template fonts"""
+        # Only set the bullet level, don't override template fonts/colors
         paragraph.level = 0
-        for run in paragraph.runs:
-            font = run.font
-            font.name = 'Calibri'
-            font.size = Pt(18)
-            font.color.rgb = self.TEXT_COLOR
+        # Remove all font overrides to preserve template formatting
+        # Template should handle font, size, and color

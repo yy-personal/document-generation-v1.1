@@ -201,6 +201,7 @@ SESSION_ID_UNIQUE_LENGTH = 8
 # ====================================================================
 
 TEMPLATE_CONFIG = {
+    "use_templates": False,  # Set to False to disable all custom templates
     "default_template": "templates/default_template.pptx",
     "company_template": "templates/company_template.pptx", 
     "executive_template": "templates/executive_template.pptx",
@@ -237,6 +238,11 @@ def get_max_slides() -> int:
 def get_template_path(template_type: str = "default") -> str:
     """Get template file path based on presentation type"""
     import os
+    
+    # Check if templates are enabled
+    if not TEMPLATE_CONFIG.get("use_templates", True):
+        print("Templates disabled in config - using python-pptx default")
+        return None
     
     # Get template name from mapping
     template_name = TEMPLATE_MAPPING.get(template_type, "default_template")
