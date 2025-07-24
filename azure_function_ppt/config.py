@@ -40,10 +40,9 @@ SUPPORTED_OUTPUT_FORMATS = [
 
 # Slide count settings - CENTRALIZED CONTROL
 PRESENTATION_CONFIG = {
-    "default_slides": 12,
-    "max_slides": 15,        # MAXIMUM allowed slides
-    "min_slides": 3,
-    "use_case": "Standard business presentations for all content types"
+    "max_slides": 30,        # MAXIMUM allowed slides (hard limit)
+    "min_slides": 3,         # MINIMUM slides for basic presentation structure
+    "use_case": "Flexible business presentations - agents determine optimal slide count based on content"
 }
 
 # ====================================================================
@@ -53,11 +52,74 @@ PRESENTATION_CONFIG = {
 SLIDE_LAYOUTS = {
     "TITLE_SLIDE": "Company logo, title, subtitle, presenter info",
     "AGENDA_SLIDE": "Overview of presentation topics (3-8 items)",
+    "INTRODUCTION_SLIDE": "Introduction and context setting",
     "CONTENT_SLIDE": "Standard content with title and bullet points",
+    "KEY_INSIGHT_SLIDE": "Key insights and important findings",
     "TWO_COLUMN_SLIDE": "Comparative content, before/after, pros/cons",
+    "RECOMMENDATIONS_SLIDE": "Recommendations and action items",
+    "CONCLUSION_SLIDE": "Conclusions and final thoughts",
     "SUMMARY_SLIDE": "Key takeaways and conclusions (3-6 points)",
     "THANK_YOU_SLIDE": "Contact information and next steps"
 }
+
+# ====================================================================
+# PRESENTATION OUTLINE STRUCTURE
+# ====================================================================
+
+# Standard presentation outline that should be followed whenever possible
+STANDARD_OUTLINE = [
+    {"type": "TITLE_SLIDE", "title": "Title", "required": True},
+    {"type": "AGENDA_SLIDE", "title": "Agenda", "required": True},
+    {"type": "INTRODUCTION_SLIDE", "title": "Introduction", "required": True},
+    {"type": "KEY_INSIGHT_SLIDE", "title": "Key Insight", "required": False, "repeatable": True},
+    {"type": "RECOMMENDATIONS_SLIDE", "title": "Recommendations", "required": True},
+    {"type": "CONCLUSION_SLIDE", "title": "Conclusion", "required": True},
+    {"type": "THANK_YOU_SLIDE", "title": "Thank You", "required": True}
+]
+
+def get_outline_structure(available_slides: int) -> list:
+    """
+    Generate flexible presentation outline based on available slides.
+    This is used as a fallback structure - agents can create their own optimal structure.
+    """
+    # Ensure we respect the minimum slide count
+    min_slides = PRESENTATION_CONFIG["min_slides"]
+    available_slides = max(available_slides, min_slides)
+    
+    if available_slides < 7:
+        # Minimal outline for very short presentations
+        return [
+            {"type": "TITLE_SLIDE", "title": "Title"},
+            {"type": "INTRODUCTION_SLIDE", "title": "Introduction"},
+            {"type": "KEY_INSIGHT_SLIDE", "title": "Key Insights"},
+            {"type": "RECOMMENDATIONS_SLIDE", "title": "Recommendations"},
+            {"type": "THANK_YOU_SLIDE", "title": "Thank You"}
+        ][:available_slides]
+    
+    # Standard structure with flexible Key Insight slots
+    required_slides = 6  # Title, Agenda, Introduction, Recommendations, Conclusion, Thank You
+    key_insight_slots = max(1, available_slides - required_slides)
+    
+    outline = [
+        {"type": "TITLE_SLIDE", "title": "Title"},
+        {"type": "AGENDA_SLIDE", "title": "Agenda"},
+        {"type": "INTRODUCTION_SLIDE", "title": "Introduction"}
+    ]
+    
+    # Add Key Insight slides
+    for i in range(key_insight_slots):
+        if i == 0:
+            outline.append({"type": "KEY_INSIGHT_SLIDE", "title": "Key Insight #1"})
+        else:
+            outline.append({"type": "KEY_INSIGHT_SLIDE", "title": f"Key Insight #{i+1}"})
+    
+    outline.extend([
+        {"type": "RECOMMENDATIONS_SLIDE", "title": "Recommendations"},
+        {"type": "CONCLUSION_SLIDE", "title": "Conclusion"},
+        {"type": "THANK_YOU_SLIDE", "title": "Thank You"}
+    ])
+    
+    return outline
 
 # ====================================================================
 # PIPELINE CONFIGURATION
@@ -120,7 +182,7 @@ DEFAULT_AGENT_CONFIGS = {
     
     # File generation (rule-based)
     "PowerPointBuilderAgent": {
-        "max_tokens": 4000,
+        "max_tokens": 10000,
         "temperature": 0.2,
         "top_p": 0.8
     }

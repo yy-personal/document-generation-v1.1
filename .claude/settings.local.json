@@ -6,7 +6,8 @@
       "Bash(find:*)",
       "Bash(rm:*)",
       "Bash(mkdir:*)",
-      "WebFetch(domain:python-pptx.readthedocs.io)"
+      "WebFetch(domain:python-pptx.readthedocs.io)",
+      "Bash(del test_outline_structure.py)"
     ],
     "deny": []
   }

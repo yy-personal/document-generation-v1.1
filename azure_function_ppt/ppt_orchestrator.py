@@ -139,7 +139,7 @@ class PowerPointOrchestrator:
         except (json.JSONDecodeError, Exception) as e:
             print(f"Structure creation error: {str(e)}")
             return {
-                "slide_planning": {"optimal_slides": PRESENTATION_CONFIG['default_slides']},
+                "slide_planning": {"optimal_slides": 10, "reasoning": "Fallback - using standard 10 slides"},
                 "presentation_structure": []
             }
 
@@ -261,7 +261,7 @@ class PowerPointOrchestrator:
                     # STEP 3: Content analysis + slide planning + structure (NEW COMBINED STEP)
                     structure_data = await self._create_presentation_structure(extracted_content)
                     
-                    optimal_slides = structure_data.get("slide_planning", {}).get("optimal_slides", PRESENTATION_CONFIG['default_slides'])
+                    optimal_slides = structure_data.get("slide_planning", {}).get("optimal_slides", 10)
                     print(f"Optimal slides determined: {optimal_slides} (max: {get_max_slides()})")
                     
                     # STEP 4: Generate detailed slide content

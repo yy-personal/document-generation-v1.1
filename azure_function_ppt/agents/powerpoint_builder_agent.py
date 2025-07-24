@@ -130,39 +130,98 @@ class PowerPointBuilderAgent(BaseAgent):
         return slides
 
     def _create_slide(self, prs: Presentation, slide_info: dict):
-        """Create individual slide with simple formatting"""
-        layout = slide_info.get("layout", "CONTENT_SLIDE")
+        """Create individual slide with formatting based on slide type"""
+        # Get slide type and determine layout
+        slide_type = slide_info.get("slide_type") or slide_info.get("layout", "CONTENT_SLIDE")
         title = slide_info.get("title", "Slide Title")
         
-        ### --- FIX START --- ###
-        # This is the critical change.
-        # It looks for the "content" key first (from the SlideContentGenerator).
-        # If that's not found (e.g., because the generation step failed),
-        # it falls back to the "content_outline" key from the PresentationStructureAgent.
-        # This prevents slides from being created with no text content.
+        # Content can come from either "content" (detailed) or "content_outline" (structure)
         content = slide_info.get("content") or slide_info.get("content_outline", [])
-        ### --- FIX END --- ###
         
-        # Determine the slide layout based on type or position
-        slide_layout_index = 0 if layout == "TITLE_SLIDE" or not prs.slides else 1
-        if slide_layout_index >= len(prs.slide_layouts):
-            slide_layout_index = 5 # A common 'blank with content' layout as a fallback
+        # Determine the appropriate PowerPoint layout based on slide type
+        slide_layout_index = self._get_layout_index(slide_type, prs)
         slide_layout = prs.slide_layouts[slide_layout_index]
         slide = prs.slides.add_slide(slide_layout)
         
-        # Format title
+        # Apply type-specific formatting
+        self._format_slide_by_type(slide, slide_type, title, content)
+
+    def _get_layout_index(self, slide_type: str, prs: Presentation) -> int:
+        """Get appropriate layout index based on slide type"""
+        layout_mapping = {
+            "TITLE_SLIDE": 0,           # Title slide layout
+            "AGENDA_SLIDE": 1,          # Content with bullets
+            "INTRODUCTION_SLIDE": 1,    # Content with bullets  
+            "KEY_INSIGHT_SLIDE": 1,     # Content with bullets
+            "RECOMMENDATIONS_SLIDE": 1, # Content with bullets
+            "CONCLUSION_SLIDE": 1,      # Content with bullets
+            "THANK_YOU_SLIDE": 0,       # Title-style layout
+            "CONTENT_SLIDE": 1,         # Default content
+            "TWO_COLUMN_SLIDE": 2,      # Two column if available
+            "SUMMARY_SLIDE": 1          # Content with bullets
+        }
+        
+        layout_index = layout_mapping.get(slide_type, 1)
+        
+        # Fallback if layout doesn't exist
+        max_layouts = len(prs.slide_layouts)
+        if layout_index >= max_layouts:
+            layout_index = min(1, max_layouts - 1)
+            
+        return layout_index
+
+    def _format_slide_by_type(self, slide, slide_type: str, title: str, content):
+        """Apply type-specific formatting to slide"""
+        # Set title
         if slide.shapes.title:
             slide.shapes.title.text = title
-            self._apply_title_format(slide.shapes.title)
+            self._apply_title_format_by_type(slide.shapes.title, slide_type)
         
-        # Add content
+        # Add content based on slide type
+        if slide_type == "TITLE_SLIDE":
+            self._format_title_slide(slide, content)
+        elif slide_type == "THANK_YOU_SLIDE":
+            self._format_thank_you_slide(slide, content)
+        else:
+            self._format_content_slide(slide, content)
+
+    def _format_title_slide(self, slide, content):
+        """Format title slide with subtitle"""
+        if len(slide.placeholders) > 1:
+            subtitle_placeholder = slide.placeholders[1]
+            if subtitle_placeholder.has_text_frame:
+                subtitle_placeholder.text = "Professional Business Presentation"
+
+    def _format_thank_you_slide(self, slide, content):
+        """Format thank you slide"""
+        if len(slide.placeholders) > 1:
+            content_placeholder = slide.placeholders[1]
+            if content_placeholder.has_text_frame:
+                text_frame = content_placeholder.text_frame
+                text_frame.clear()
+                
+                # Default thank you content if none provided
+                thank_you_content = content if content else [
+                    "Thank you for your attention",
+                    "Questions & Discussion",
+                    "Contact: [your-email@company.com]"
+                ]
+                
+                content_list = thank_you_content if isinstance(thank_you_content, list) else [thank_you_content]
+                
+                for i, item in enumerate(content_list[:4]):
+                    p = text_frame.paragraphs[0] if i == 0 else text_frame.add_paragraph()
+                    p.text = str(item)
+                    self._apply_content_format(p)
+
+    def _format_content_slide(self, slide, content):
+        """Format regular content slide with bullets"""
         if len(slide.placeholders) > 1 and content:
             content_placeholder = slide.placeholders[1]
             if content_placeholder.has_text_frame:
                 text_frame = content_placeholder.text_frame
                 text_frame.clear()
                 
-                # Make sure content is a list
                 content_list = content if isinstance(content, list) else [content]
                 
                 for i, item in enumerate(content_list[:6]):  # Max 6 items
@@ -170,16 +229,23 @@ class PowerPointBuilderAgent(BaseAgent):
                     p.text = str(item)
                     self._apply_content_format(p)
 
-    def _apply_title_format(self, title_shape):
-        """Apply title formatting with primary color"""
+    def _apply_title_format_by_type(self, title_shape, slide_type: str):
+        """Apply title formatting based on slide type"""
         if title_shape.has_text_frame:
             for paragraph in title_shape.text_frame.paragraphs:
                 for run in paragraph.runs:
                     font = run.font
                     font.name = 'Calibri'
-                    font.size = Pt(32)
+                    
+                    # Different sizes for different slide types
+                    if slide_type in ["TITLE_SLIDE", "THANK_YOU_SLIDE"]:
+                        font.size = Pt(36)
+                    else:
+                        font.size = Pt(32)
+                    
                     font.bold = True
                     font.color.rgb = self.PRIMARY_COLOR
+
 
     def _apply_content_format(self, paragraph):
         """Apply content formatting"""
