@@ -2,7 +2,7 @@
 PowerPoint Builder Agent - With template support
 """
 from pptx import Presentation
-from pptx.util import Pt
+from pptx.util import Pt, Inches
 from pptx.dml.color import RGBColor
 from typing import Dict, Any, Optional
 from agents.core.base_agent import BaseAgent
@@ -12,16 +12,17 @@ import io
 import os
 
 class PowerPointBuilderAgent(BaseAgent):
-    """Builds PowerPoint files with simple 2-color theme"""
+    """Builds PowerPoint files with 16:9 aspect ratio and simple 2-color theme"""
 
     # Simple color theme
     PRIMARY_COLOR = RGBColor(88, 77, 193)    # #584dc1 (purple)
     ACCENT_COLOR = RGBColor(209, 185, 91)    # #d1b95b (gold)
     TEXT_COLOR = RGBColor(51, 51, 51)        # Dark gray
 
-    agent_description = "PowerPoint file generation with template support"
+    agent_description = "PowerPoint file generation with 16:9 aspect ratio and template support"
     agent_use_cases = [
         "PowerPoint file creation from slide content",
+        "16:9 widescreen presentation generation", 
         "Template-based presentation generation",
         "Custom branding and layouts", 
         "Professional formatting"
@@ -29,6 +30,11 @@ class PowerPointBuilderAgent(BaseAgent):
 
     def __init__(self, **kwargs):
         super().__init__()
+    
+    def _set_16_9_aspect_ratio(self, prs: Presentation):
+        """Set presentation to 16:9 aspect ratio"""
+        prs.slide_width = Inches(16)
+        prs.slide_height = Inches(9)
 
     async def process(self, slide_content: str, context_metadata: Optional[Dict[str, Any]] = None) -> bytes:
         """Generate PowerPoint file from slide content with template support"""
@@ -43,6 +49,9 @@ class PowerPointBuilderAgent(BaseAgent):
             else:
                 print("Using python-pptx default template (no custom design)")
                 prs = Presentation()
+            
+            # Always set to 16:9 aspect ratio
+            self._set_16_9_aspect_ratio(prs)
             
             for slide_info in slides_data:
                 self._create_slide(prs, slide_info)
@@ -61,6 +70,9 @@ class PowerPointBuilderAgent(BaseAgent):
                 try:
                     slides_data = self._parse_slide_content(slide_content)
                     prs = Presentation()  # Use default
+                    
+                    # Always set to 16:9 aspect ratio
+                    self._set_16_9_aspect_ratio(prs)
                     
                     for slide_info in slides_data:
                         self._create_slide(prs, slide_info)

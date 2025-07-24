@@ -128,7 +128,7 @@ class PresentationStructureAgent(BaseAgent):
             analysis_prompt = f"""
             CONTENT ANALYSIS & STRUCTURE CREATION:
             
-            EXTRACTED CONTENT TO ANALYZE: {extracted_content[:4000]}
+            EXTRACTED CONTENT TO ANALYZE: {extracted_content[:12000]}
             
             CRITICAL REQUIREMENTS:
             1. **ANALYZE THE ACTUAL CONTENT**: Base your analysis on the specific content provided above

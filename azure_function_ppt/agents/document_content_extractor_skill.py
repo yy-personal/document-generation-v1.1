@@ -71,7 +71,7 @@ class DocumentContentExtractor(BaseAgent):
             analysis_prompt = f"""
             DOCUMENT CONTENT EXTRACTION:
             
-            DOCUMENT TEXT: "{content[:3000]}..."
+            DOCUMENT TEXT: "{content[:10000]}..."
             
             Extract and organize the key information from this document for a business presentation.
             Focus on identifying the main topics and supporting points that would work well as slides.
