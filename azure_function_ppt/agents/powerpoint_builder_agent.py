@@ -226,6 +226,7 @@ class PowerPointBuilderAgent(BaseAgent):
             try:
                 subtitle_text = content[0] if content else "Professional Business Presentation"
                 subtitle_placeholder.text = str(subtitle_text)
+                self._apply_smart_text_formatting(subtitle_placeholder, str(subtitle_text))
                 print(f"Set title slide subtitle: {subtitle_text}")
             except Exception as e:
                 print(f"Error setting title slide content: {e}")
@@ -250,6 +251,7 @@ class PowerPointBuilderAgent(BaseAgent):
                 # Simple text assignment - preserve template formatting
                 ending_text = '\n'.join(content_list[:4])
                 content_placeholder.text = ending_text
+                self._apply_smart_text_formatting(content_placeholder, ending_text)
                 print(f"Set NCS ending slide content")
                 
             except Exception as e:
@@ -269,6 +271,7 @@ class PowerPointBuilderAgent(BaseAgent):
                 # Simple text assignment - let template handle the formatting
                 standout_text = '\n'.join(content_list[:2])  # Max 2 items for standout
                 content_placeholder.text = standout_text
+                self._apply_smart_text_formatting(content_placeholder, standout_text)
                 print(f"Set standout slide content")
                 
             except Exception as e:
@@ -277,7 +280,7 @@ class PowerPointBuilderAgent(BaseAgent):
             print("No content placeholder found for standout slide")
 
     def _format_any_slide_content(self, slide, content, slide_type):
-        """SIMPLIFIED: Format any slide content - let template handle design"""
+        """SIMPLIFIED: Format any slide content with dynamic font sizing"""
         content_placeholder = self._find_content_placeholder(slide)
         
         if content_placeholder and content:
@@ -292,6 +295,9 @@ class PowerPointBuilderAgent(BaseAgent):
                     # Multiple items - DON'T add manual bullets, let PowerPoint's template handle it
                     content_text = '\n'.join([str(item) for item in content_list[:6]])
                     content_placeholder.text = content_text
+                
+                # Apply smart text formatting with auto-fit
+                self._apply_smart_text_formatting(content_placeholder, content_text if len(content_list) > 1 else str(content_list[0]))
                     
                 print(f"Successfully set content for {slide_type}: {len(content_list)} items")
                 
@@ -301,6 +307,7 @@ class PowerPointBuilderAgent(BaseAgent):
                 try:
                     simple_text = str(content[0]) if isinstance(content, list) and content else str(content)
                     content_placeholder.text = simple_text
+                    self._apply_smart_text_formatting(content_placeholder, simple_text)
                     print("Used simple text fallback")
                 except Exception as e2:
                     print(f"All methods failed for {slide_type}: {e2}")
@@ -359,6 +366,81 @@ class PowerPointBuilderAgent(BaseAgent):
         
         print("No working content placeholder found!")
         return None
+
+    def _apply_smart_text_formatting(self, content_placeholder, content_text: str):
+        """
+        Apply smart text formatting with auto-fit and word wrap
+        
+        HOW TO ADJUST TEXT POSITIONING IN THE FUTURE:
+        
+        1. MARGINS (text_frame.margin_*):
+           - margin_left/right: Controls horizontal spacing from slide edges
+           - margin_top/bottom: Controls vertical spacing from slide edges
+           - Use Inches(value) - typical range: 0.1 to 0.8 inches
+        
+        2. VERTICAL ALIGNMENT (text_frame.vertical_anchor):
+           - MSO_ANCHOR.TOP: Text starts at top of text box
+           - MSO_ANCHOR.MIDDLE: Text centered vertically in text box  
+           - MSO_ANCHOR.BOTTOM: Text aligned to bottom of text box
+        
+        3. HORIZONTAL ALIGNMENT (paragraph.alignment):
+           - PP_ALIGN.LEFT: Left-aligned (best for bullets)
+           - PP_ALIGN.CENTER: Center-aligned
+           - PP_ALIGN.RIGHT: Right-aligned
+           - PP_ALIGN.JUSTIFY: Justified text
+        
+        4. FONT SIZE: Adjust base_font_size values below for different text lengths
+        
+        5. AUTO-FIT BEHAVIOR (text_frame.auto_size):
+           - MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE: Shrinks text to fit
+           - MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT: Expands text box
+           - MSO_AUTO_SIZE.NONE: No auto-sizing
+        """
+        if not content_placeholder.has_text_frame:
+            return
+            
+        try:
+            text_frame = content_placeholder.text_frame
+            
+            # Enable word wrap for better text flow
+            text_frame.word_wrap = True
+            
+            # Configure auto-sizing behavior
+            from pptx.enum.text import MSO_AUTO_SIZE, MSO_ANCHOR
+            text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+            
+            # Set vertical text alignment - center vertically within the text box
+            text_frame.vertical_anchor = MSO_ANCHOR.TOP  # Options: TOP, MIDDLE, BOTTOM
+            
+            # Set better margins for professional layout - move content away from edges
+            text_frame.margin_left = Inches(0.3)    # More space from left edge
+            text_frame.margin_right = Inches(0.3)   # More space from right edge  
+            text_frame.margin_top = Inches(0.4)     # Move content down from top
+            text_frame.margin_bottom = Inches(0.3)  # Space at bottom
+            
+            # Set a good starting font size - let auto-fit adjust as needed
+            char_count = len(content_text.strip())
+            if char_count <= 200:
+                base_font_size = 24  # Start larger for short content
+            elif char_count <= 400:
+                base_font_size = 22  # Medium starting size
+            else:
+                base_font_size = 20  # Smaller starting size for long content
+            
+            # Apply base font size and alignment to all content
+            from pptx.enum.text import PP_ALIGN
+            for paragraph in text_frame.paragraphs:
+                # Set paragraph alignment (left is usually best for bullet points)
+                paragraph.alignment = PP_ALIGN.LEFT
+                
+                for run in paragraph.runs:
+                    run.font.size = Pt(base_font_size)
+                    run.font.name = 'Calibri'
+                        
+            print(f"Applied auto-fit formatting with {base_font_size}pt base size for {char_count} characters")
+            
+        except Exception as e:
+            print(f"Error applying smart text formatting: {e}")
 
     def _apply_content_format(self, paragraph):
         """Apply minimal content formatting - preserve template fonts"""
