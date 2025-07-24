@@ -6,13 +6,10 @@ import os
 import base64
 from ppt_orchestrator import PowerPointOrchestrator
 
-# --- CHANGE 1: Define a local output directory ---
-# This makes it easy to find your generated files.
 # It will create a folder named 'local_output' inside your 'azure_function_ppt' directory.
 LOCAL_OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "local_output")
 if not os.path.exists(LOCAL_OUTPUT_DIR):
     os.makedirs(LOCAL_OUTPUT_DIR)
-# --- END CHANGE 1 ---
 
 # Define the function app
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
@@ -51,7 +48,6 @@ async def powerpoint_generation(req: func.HttpRequest) -> func.HttpResponse:
         }
         return func.HttpResponse(json.dumps(error_response), status_code=500, mimetype="application/json")
 
-    # --- CHANGE 2: Save the file locally if it was generated ---
     # Check if the response contains PowerPoint data
     if response_data.get("response_data", {}).get("powerpoint_output"):
         ppt_output = response_data["response_data"]["powerpoint_output"]
@@ -79,7 +75,6 @@ async def powerpoint_generation(req: func.HttpRequest) -> func.HttpResponse:
                 logging.error(f"Failed to save file locally: {e}")
                 # Add an error note to the response
                 response_data["response_data"]["local_save_error"] = str(e)
-    # --- END CHANGE 2 ---
 
     # Return the complete JSON response to the client
     return func.HttpResponse(
