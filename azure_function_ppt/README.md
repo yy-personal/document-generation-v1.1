@@ -168,6 +168,18 @@ azure_function_ppt/
 - Hard maximum limit enforcement (30 slides)
 - Conversation context handling
 
+**Enhanced Table Logic:**
+- Tables only created when content has comparative/structured data
+- Requires 60%+ pattern match + comparison context (vs, before/after, etc.)
+- Minimum 3 items required for table creation
+- Prevents unnecessary tables for simple lists
+
+**Sparse Content Handling:**
+- Expands brief content into detailed explanatory slides
+- Maintains minimum 12-slide presentations
+- Focuses on contextual explanations and implications
+- Prevents single-slide presentations from sparse documents
+
 **Base64 Integration:**
 - No server file storage
 - Direct frontend download

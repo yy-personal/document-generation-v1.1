@@ -124,22 +124,27 @@ class SlideContentGenerator(BaseAgent):
             6. **USE MAIN TOPICS**: Reference the main topics to ensure relevance to the source document
             
             CONTENT REQUIREMENTS:
-            - Only create slides where you have meaningful content from the source
+            - Create slides for all structured content, expanding brief outlines into detailed explanations
             - Use appropriate content format based on slide type and content nature:
               * BULLET FORMAT: For lists, key points, multiple items (2-6 items)
               * PARAGRAPH FORMAT: For explanations, descriptions, single concepts
             - Use the exact slide titles from the structure where content exists  
             - Use the exact slide types (slide_type field) from the structure
-            - Make content substantive but don't artificially expand it
-            - Each item should be derived from actual content_outline provided
-            - SKIP SLIDES if the content_outline is too thin or generic
-            - Better to have fewer high-quality slides than many weak ones
+            - EXPAND SPARSE CONTENT: When content_outline is brief, create detailed explanatory content that maintains relevance to the source
+            - For sparse content, focus on:
+              * Contextual explanations of what the content means
+              * Implications and significance of the information
+              * How it relates to the overall document theme
+              * Professional elaboration while staying factually accurate
+            - Ensure minimum 12-slide presentation even with limited source material
+            - Better to have comprehensive explanatory slides than empty presentations
             
             FORMATTING GUIDELINES:
             - Title slides: Use paragraph format for subtitle/description
             - Overview slides: Use paragraph format for narrative explanation
             - Analysis/Process slides: Use bullet format for multiple points
             - Conclusion/Summary: Use bullet format for key takeaways
+            - Thank You slides: Keep concise - maximum 3 brief items
             - DON'T add manual bullet symbols (•) - PowerPoint will handle bullets automatically
             
             OUTPUT: Valid JSON array with slides exactly matching the structure provided.

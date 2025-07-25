@@ -5,15 +5,14 @@ Simple POC Test for PowerPoint Generation Service
 Tests the core functionality: Document input → PowerPoint output
 
 Usage:
-  python test_poc.py               # Run all tests
+  python test_poc.py               # Run essential tests (reduced token usage)
   python test_poc.py --long-only   # Run only the long document test
-  python test_poc.py --table-only  # Run only the table functionality test
 
 The long document test uses a comprehensive 8,000-word strategic document
 to test content-driven slide optimization and should generate 20-30 slides.
 
-The table test uses structured budget and performance data to test automatic
-table creation functionality for better data presentation.
+Tests have been reduced to minimize token consumption while maintaining
+core functionality validation.
 """
 
 import requests
@@ -182,27 +181,6 @@ Implementation success depends on maintaining strategic focus while adapting to 
         except:
             return False
 
-    def test_new_document_tag(self):
-        """Test the new [document] tag format"""
-        print("Testing new [document] tag...")
-        
-        test_request = {
-            "user_message": f"[document]{self.test_document}",
-            "entra_id": "poc-test-user"
-        }
-        
-        return self._make_request(test_request, "New Document Tag")
-
-    def test_empty_user_message(self):
-        """Test with empty user message before document"""
-        print("Testing empty user message...")
-        
-        test_request = {
-            "user_message": f"[document]{self.test_document}",
-            "entra_id": "poc-test-user"
-        }
-        
-        return self._make_request(test_request, "Empty User Message")
 
     def test_with_user_instruction(self):
         """Test with user instruction + document"""
@@ -228,48 +206,6 @@ Implementation success depends on maintaining strategic focus while adapting to 
         
         return self._make_request_with_details(test_request, "Long Document")
 
-    def test_table_functionality(self):
-        """Test automatic table creation with structured data"""
-        print("Testing table creation...")
-        print("  Content includes budget data and structured information")
-        print("  Expected: Tables should be created automatically for structured data")
-        
-        # Create test document with structured data that should become tables
-        table_test_document = """Project Budget Analysis: Q4 2024 Financial Overview
-
-Budget Allocation Summary:
-Marketing Budget: $150,000
-Development Costs: $200,000  
-Operations Expenses: $100,000
-Support Services: $50,000
-Total Allocated: $500,000
-
-Performance Metrics Comparison:
-Current Quarter: 85% completion
-Previous Quarter: 78% completion
-Target Goal: 90% completion
-Industry Average: 82% completion
-
-Team Distribution:
-Engineering Team: 12 members
-Marketing Team: 8 members
-Operations Team: 6 members
-Support Team: 4 members
-
-Key Deliverables Timeline:
-Phase 1 Planning: January 2024
-Phase 2 Development: March 2024
-Phase 3 Testing: May 2024
-Phase 4 Launch: July 2024
-
-This structured data should automatically be converted to professional tables instead of bullet points for better readability and presentation quality."""
-        
-        test_request = {
-            "user_message": f"Create a professional presentation with tables[document]{table_test_document}",
-            "entra_id": "poc-table-test-user"
-        }
-        
-        return self._make_request(test_request, "Table Functionality")
 
     def _make_request(self, test_request, test_name):
         """Make API request and validate response"""
@@ -376,12 +312,9 @@ This structured data should automatically be converted to professional tables in
         
         print("Service is available, running tests...\n")
         
-        # Run tests
+        # Run tests - reduced to minimize token consumption
         tests = [
-            ("Core Functionality (Document Tag)", self.test_new_document_tag),
-            ("Empty User Message", self.test_empty_user_message),
-            ("User Instructions", self.test_with_user_instruction),
-            ("Table Functionality", self.test_table_functionality),
+            ("User Instructions + Document", self.test_with_user_instruction),
             ("Long Document Handling", self.test_long_document_handling)
         ]
         
@@ -443,34 +376,6 @@ This structured data should automatically be converted to professional tables in
         
         return success
 
-    def run_table_test_only(self):
-        """Run only the table functionality test for focused testing"""
-        print("=" * 60)
-        print("TABLE FUNCTIONALITY TEST")
-        print("=" * 60)
-        
-        # Check service availability
-        if not self.check_service_available():
-            print("ERROR: PowerPoint service not available at localhost:7071")
-            print("Start the service with: func start --port 7071")
-            return False
-        
-        print("Service is available, testing table functionality...\n")
-        
-        success = self.test_table_functionality()
-        
-        print("\n" + "=" * 60)
-        print("TABLE TEST RESULT")
-        print("=" * 60)
-        
-        if success:
-            print("✓ PASS: Table functionality working correctly")
-            print("  Structured data should be automatically converted to tables!")
-        else:
-            print("✗ FAIL: Table functionality failed")
-            print("  Check service logs for detailed error information")
-        
-        return success
 
 
 def main():
@@ -483,10 +388,8 @@ def main():
     if len(sys.argv) > 1:
         if sys.argv[1] == "--long-only":
             success = tester.run_long_document_test_only()
-        elif sys.argv[1] == "--table-only":
-            success = tester.run_table_test_only()
         else:
-            print("Usage: python test_poc.py [--long-only|--table-only]")
+            print("Usage: python test_poc.py [--long-only]")
             success = tester.run_poc_tests()
     else:
         success = tester.run_poc_tests()

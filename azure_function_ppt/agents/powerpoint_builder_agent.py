@@ -241,11 +241,10 @@ class PowerPointBuilderAgent(BaseAgent):
         content_placeholder = self._find_content_placeholder(slide)
         if content_placeholder:
             try:
-                # NCS Singapore specific content
+                # NCS Singapore specific content - concise format
                 ncs_content = content if content else [
-                    "Thank you for your attention",
+                    "Thank you",
                     "NCS Singapore", 
-                    "Leading Digital Transformation",
                     "Questions & Discussion"
                 ]
                 
@@ -290,8 +289,11 @@ class PowerPointBuilderAgent(BaseAgent):
             try:
                 content_list = content if isinstance(content, list) else [content]
                 
-                # Check if content should be a table
-                table_info = self._detect_table_content(content_list)
+                # Skip table detection for Title and Agenda slides
+                should_check_table = slide_type not in ["TITLE_SLIDE", "AGENDA_SLIDE"]
+                
+                # Check if content should be a table (only for appropriate slide types)
+                table_info = self._detect_table_content(content_list) if should_check_table else {"is_table": False}
                 
                 if table_info["is_table"]:
                     # Remove the content placeholder and create a table instead
@@ -464,11 +466,11 @@ class PowerPointBuilderAgent(BaseAgent):
             print(f"Error applying smart text formatting: {e}")
 
     def _detect_table_content(self, content_list: list) -> dict:
-        """Detect if content should be presented as a table"""
-        if not content_list or len(content_list) < 2:
+        """Detect if content should be presented as a table - only when there's comparative/structured data"""
+        if not content_list or len(content_list) < 3:  # Require at least 3 items for comparison
             return {"is_table": False}
         
-        # Look for patterns that suggest tabular data
+        # Look for patterns that suggest tabular/comparative data
         table_patterns = [
             r'\w+\s*:\s*\$[\d,]+',      # Item: $amount
             r'\w+\s*:\s*\d+\.?\d*%',    # Item: percentage  
@@ -476,16 +478,35 @@ class PowerPointBuilderAgent(BaseAgent):
             r'[A-Z][^:]*:\s*.+',        # Category: description
         ]
         
+        # Also look for comparison indicators
+        comparison_keywords = [
+            'vs', 'versus', 'compared to', 'difference', 'increase', 'decrease',
+            'before', 'after', 'baseline', 'target', 'actual', 'budget',
+            'quarter', 'year', 'month', 'period', 'phase'
+        ]
+        
         matches = 0
+        has_comparison_context = False
+        
+        # Check for structured data patterns
         for item in content_list[:6]:  # Check first 6 items
-            item_str = str(item)
+            item_str = str(item).lower()
             for pattern in table_patterns:
-                if re.search(pattern, item_str):
+                if re.search(pattern, str(item)):
                     matches += 1
                     break
+            
+            # Check for comparison context
+            if any(keyword in item_str for keyword in comparison_keywords):
+                has_comparison_context = True
         
-        # If 50%+ of items match table patterns, create a table
-        if matches >= len(content_list) * 0.5 and matches >= 2:
+        # Only create table if:
+        # 1. 60%+ of items match table patterns (raised from 50%)
+        # 2. There are at least 3 matches (comparative data)
+        # 3. Content suggests comparison/structured analysis
+        if (matches >= len(content_list) * 0.6 and 
+            matches >= 3 and 
+            (has_comparison_context or matches >= 4)):
             table_data = self._parse_table_data(content_list)
             return {
                 "is_table": True,
@@ -497,22 +518,86 @@ class PowerPointBuilderAgent(BaseAgent):
         return {"is_table": False}
 
     def _parse_table_data(self, content_list: list) -> list:
-        """Parse content into table rows"""
+        """Parse content into table rows with proper header detection"""
         table_data = []
         
-        for item in content_list:
-            item_str = str(item).strip()
+        # Check if first item looks like headers (no colon, contains common header words)
+        first_item = str(content_list[0]).strip() if content_list else ""
+        header_indicators = ['phase', 'description', 'item', 'value', 'category', 'type', 'name', 'amount', 'date', 'status']
+        
+        has_headers = (
+            ':' not in first_item and  # Headers typically don't have colons
+            any(indicator in first_item.lower() for indicator in header_indicators) and
+            len(content_list) > 1
+        )
+        
+        if has_headers:
+            # Create proper headers based on content analysis
+            sample_content = content_list[1] if len(content_list) > 1 else content_list[0]
             
-            # Split on colon for key:value pairs
-            if ':' in item_str:
-                parts = item_str.split(':', 1)
-                if len(parts) == 2:
-                    table_data.append([parts[0].strip(), parts[1].strip()])
-                else:
-                    table_data.append([item_str, ""])
+            if 'phase' in first_item.lower():
+                headers = ["Phase", "Description"]
+            elif 'budget' in first_item.lower() or '$' in str(sample_content):
+                headers = ["Item", "Amount"]
+            elif 'team' in first_item.lower() or 'member' in str(sample_content).lower():
+                headers = ["Team", "Size"]
+            elif 'metric' in first_item.lower() or '%' in str(sample_content):
+                headers = ["Metric", "Value"]
+            elif 'timeline' in first_item.lower() or any(month in str(sample_content).lower() for month in ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']):
+                headers = ["Deliverable", "Timeline"]
             else:
-                # If no colon, put entire text in first column
-                table_data.append([item_str, ""])
+                # Generic headers based on content structure
+                headers = ["Category", "Description"]
+            
+            table_data.append(headers)
+            
+            # Process all items as data rows (skip first item if it was just header indicator)
+            start_index = 1 if any(indicator in first_item.lower() for indicator in header_indicators) else 0
+            
+            for item in content_list[start_index:]:
+                item_str = str(item).strip()
+                
+                # Split on colon for key:value pairs
+                if ':' in item_str:
+                    parts = item_str.split(':', 1)
+                    if len(parts) == 2:
+                        table_data.append([parts[0].strip(), parts[1].strip()])
+                    else:
+                        table_data.append([item_str, ""])
+                else:
+                    # If no colon, put entire text in first column
+                    table_data.append([item_str, ""])
+        else:
+            # No headers detected - add generic headers and process as key:value pairs
+            # Analyze content to determine appropriate headers
+            sample_content = str(content_list[0]) if content_list else ""
+            
+            if '$' in sample_content:
+                headers = ["Item", "Amount"]
+            elif '%' in sample_content:
+                headers = ["Factor", "Percentage"]
+            elif any(month in sample_content.lower() for month in ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'q1', 'q2', 'q3', 'q4']):
+                headers = ["Activity", "Timeline"]
+            elif 'team' in sample_content.lower() or 'department' in sample_content.lower():
+                headers = ["Department", "Details"]
+            else:
+                headers = ["Item", "Details"]
+            
+            table_data.append(headers)
+            
+            for item in content_list:
+                item_str = str(item).strip()
+                
+                # Split on colon for key:value pairs
+                if ':' in item_str:
+                    parts = item_str.split(':', 1)
+                    if len(parts) == 2:
+                        table_data.append([parts[0].strip(), parts[1].strip()])
+                    else:
+                        table_data.append([item_str, ""])
+                else:
+                    # If no colon, put entire text in first column
+                    table_data.append([item_str, ""])
         
         return table_data[:8]  # Limit to 8 rows for readability
 
@@ -555,11 +640,21 @@ class PowerPointBuilderAgent(BaseAgent):
                     
                     for run in paragraph.runs:
                         run.font.name = 'Calibri'
-                        run.font.size = Pt(18)
                         
-                        # Make first column bold (labels)
-                        if col_idx == 0:
+                        # Header row formatting (first row)
+                        if row_idx == 0:
+                            run.font.size = Pt(16)
                             run.font.bold = True
+                            run.font.color.rgb = RGBColor(255, 255, 255)  # White text
+                            # Set header row background color
+                            cell.fill.solid()
+                            cell.fill.fore_color.rgb = RGBColor(88, 77, 193)  # Purple theme color
+                        else:
+                            # Content rows
+                            run.font.size = Pt(14)
+                            # Make first column bold (labels) for content rows
+                            if col_idx == 0:
+                                run.font.bold = True
             
             print(f"Created table with {rows} rows and {cols} columns")
             return True
