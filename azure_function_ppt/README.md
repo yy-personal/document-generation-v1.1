@@ -14,11 +14,12 @@ Document Upload → Intent Analysis → Content Extraction → Structure Plannin
 
 ## Features
 
-✅ **Configurable Slide Limits** - Maximum 15 slides (configurable in config.py)  
+✅ **Content-Driven Slide Count** - Up to 30 slides maximum, optimized based on content complexity  
+✅ **16:9 Widescreen Format** - Modern widescreen aspect ratio for all presentations  
 ✅ **Smart Context Handling** - Continuation requests and conversation memory  
 ✅ **Simple 2-Color Theme** - Purple (#584dc1) and Gold (#d1b95b) proof of concept  
 ✅ **Integrated Document Processing** - PDF/Word files via base64 input  
-✅ **Consistent Output** - Standard business presentation format  
+✅ **Flexible Presentation Structure** - Adapts to content volume and complexity  
 
 ## Agent Architecture
 
@@ -37,22 +38,29 @@ Document Upload → Intent Analysis → Content Extraction → Structure Plannin
 |-------|---------|-------|--------|
 | **SmartPresentationProcessor** | Intent analysis | User request | CREATE_PRESENTATION vs INFORMATION_REQUEST |
 | **DocumentContentExtractor** | Content organization | Raw document | Organized topics |
-| **PresentationStructureAgent** | Slide planning | Organized content | Slide count + structure |
+| **PresentationStructureAgent** | Content analysis + slide planning | Organized content | Optimal slide count + structure (3-30 slides) |
 | **SlideContentGenerator** | Content creation | Slide structure | Detailed content |
-| **PowerPointBuilderAgent** | File generation | Slide content | Binary .pptx |
+| **PowerPointBuilderAgent** | File generation | Slide content | Binary .pptx (16:9 format) |
 
 ## Configuration
 
-### Slide Limits (config.py)
+### Slide Configuration (config.py)
 ```python
 PRESENTATION_CONFIG = {
-    "default_slides": 12,
-    "max_slides": 15,        # CONFIGURABLE MAXIMUM
-    "min_slides": 8
+    "max_slides": 30,        # MAXIMUM allowed slides (hard limit)
+    "min_slides": 3,         # MINIMUM slides for basic presentation structure
+    "use_case": "Flexible business presentations - agents determine optimal slide count based on content"
 }
 ```
 
-### Simple Theme
+### Content-Driven Slide Count Guidelines
+- **Light content** (1-2 main topics): 6-8 slides typically optimal
+- **Medium content** (3-5 main topics): 9-12 slides for proper coverage  
+- **Heavy content** (6+ main topics): 12-30 slides for comprehensive presentation
+- **Content complexity** and volume guide slide count decisions automatically
+
+### Presentation Format & Theme
+- **Aspect Ratio**: 16:9 widescreen (modern standard)
 - **Primary**: #584dc1 (Purple) - Titles
 - **Accent**: #d1b95b (Gold) - Available for highlights  
 - **Text**: Dark gray - Content
@@ -67,10 +75,10 @@ POST /api/powerpoint_generation
 
 ### Request Examples
 
-**Direct Upload:**
+**Document Upload:**
 ```json
 {
-  "user_message": "[word_document_extraction]Functional Specification...",
+  "user_message": "[document]Functional Specification...",
   "entra_id": "user-123"
 }
 ```
@@ -95,7 +103,8 @@ POST /api/powerpoint_generation
       "intent": {...},
       "slide_planning": {
         "optimal_slides": 12,
-        "max_slides_enforced": 15
+        "max_slides_enforced": 30,
+        "content_complexity": "medium"
       }
     },
     "pipeline_info": ["SmartPresentationProcessor", "DocumentContentExtractor", ...],
@@ -147,17 +156,29 @@ azure_function_ppt/
 
 ## Key Features
 
-**Simplified Architecture:**
+**Content-Driven Architecture:**
 - Single presentation format (standard business)
-- Configurable maximum slides (15 default)
+- Flexible slide count (3-30 slides based on content)
 - 2-color theme for proof of concept
-- No presentation type complexity
+- Content complexity determines structure
 
 **Smart Processing:**
 - Intent-only classification (no premature slide planning)
-- Content analysis determines optimal slide count
-- Maximum slide enforcement
+- Content volume analysis determines optimal slide count
+- Hard maximum limit enforcement (30 slides)
 - Conversation context handling
+
+**Enhanced Table Logic:**
+- Tables only created when content has comparative/structured data
+- Requires 60%+ pattern match + comparison context (vs, before/after, etc.)
+- Minimum 3 items required for table creation
+- Prevents unnecessary tables for simple lists
+
+**Sparse Content Handling:**
+- Expands brief content into detailed explanatory slides
+- Maintains minimum 12-slide presentations
+- Focuses on contextual explanations and implications
+- Prevents single-slide presentations from sparse documents
 
 **Base64 Integration:**
 - No server file storage
@@ -167,8 +188,8 @@ azure_function_ppt/
 ## Performance
 
 - **Generation Time**: ~12-15 seconds
-- **Slide Range**: 8-15 slides (15 max enforced)
-- **File Size**: ~50-200KB typical output
+- **Slide Range**: 3-30 slides (content-driven optimization)
+- **File Size**: ~50-500KB typical output (varies with slide count)
 - **Memory Usage**: <500MB per request
 
 ## Dependencies
@@ -183,4 +204,4 @@ python-pptx>=1.0.2
 
 ---
 
-**PowerPoint Generation Service** - Simplified architecture with configurable slide limits and 2-color theme for efficient business presentation generation.
+**PowerPoint Generation Service** - Content-driven architecture with flexible slide optimization (3-30 slides) and 2-color theme for efficient business presentation generation.

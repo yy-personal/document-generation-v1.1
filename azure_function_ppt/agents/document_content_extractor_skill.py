@@ -71,12 +71,12 @@ class DocumentContentExtractor(BaseAgent):
             analysis_prompt = f"""
             DOCUMENT CONTENT EXTRACTION:
             
-            DOCUMENT TEXT: "{content[:3000]}..."
+            DOCUMENT TEXT: "{content[:10000]}..."
             
             Extract and organize the key information from this document for a business presentation.
             Focus on identifying the main topics and supporting points that would work well as slides.
             
-            Organize content into clear topics with bullet points suitable for slides.
+            Organize content into clear topics with bullet points suitable for slides, using markdown headings.
             """
             
             self.add_user_message(analysis_prompt)
@@ -88,7 +88,17 @@ class DocumentContentExtractor(BaseAgent):
                 arguments=arguments
             )
 
-            response_content = str(response.content) if hasattr(response, 'content') else str(response)
+            # Handle semantic kernel response
+            if hasattr(response, 'message'):
+                # New format: AgentResponseItem with message attribute
+                response_content = str(response.message.content) if hasattr(response.message, 'content') else str(response.message)
+            elif isinstance(response, list) and len(response) > 0:
+                # Old format: list of messages
+                last_message = response[-1]
+                response_content = str(last_message.content) if hasattr(last_message, 'content') else str(last_message)
+            else:
+                response_content = str(response)
+
             self.add_assistant_message(response_content)
             
             return response_content

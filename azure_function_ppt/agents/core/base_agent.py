@@ -1,6 +1,7 @@
 """
 Base Agent Class for PowerPoint Service
 """
+from semantic_kernel.contents import ChatMessageContent, AuthorRole
 
 class BaseAgent:
     """Base class for all PowerPoint generation agents"""
@@ -12,11 +13,13 @@ class BaseAgent:
 
     def add_user_message(self, content: str):
         """Add user message to conversation history"""
-        self.conversation_history.append({"role": "user", "content": content})
+        message = ChatMessageContent(role=AuthorRole.USER, content=content)
+        self.conversation_history.append(message)
 
     def add_assistant_message(self, content: str):
         """Add assistant message to conversation history"""
-        self.conversation_history.append({"role": "assistant", "content": content})
+        message = ChatMessageContent(role=AuthorRole.ASSISTANT, content=content)
+        self.conversation_history.append(message)
 
     def get_conversation_history(self):
         """Get current conversation history"""

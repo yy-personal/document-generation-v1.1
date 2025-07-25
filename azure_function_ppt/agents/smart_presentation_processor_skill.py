@@ -40,7 +40,7 @@ class SmartPresentationProcessor(BaseAgent):
            - "what can you do", "how does this work", "explain features"
            - "what's in this document" (asking about content, not requesting action)
 
-        RESPONSE FORMAT (JSON only):
+        RESPONSE FORMAT (JSON only, no markdown):
         {
             "intent": "CREATE_PRESENTATION" | "INFORMATION_REQUEST",
             "confidence": 0.85,
@@ -49,6 +49,7 @@ class SmartPresentationProcessor(BaseAgent):
 
         DO NOT analyze slide count, content structure, or document details.
         Focus ONLY on understanding what the user wants to accomplish.
+        Your entire output must be a single, valid JSON object.
         """
 
         self.agent = ChatCompletionAgent(
@@ -68,11 +69,9 @@ class SmartPresentationProcessor(BaseAgent):
             USER REQUEST: "{user_input}"
             CONTEXT: {"User has previous document" if has_previous_document else "New request"}
             
-            Analyze this request to determine user intent:
-            1. Do they want a PowerPoint presentation created?
-            2. Do they want information about capabilities?
-            
+            Analyze this request to determine user intent.
             Focus ONLY on intent classification. Do not analyze document content or slide requirements.
+            Output your response in the specified JSON format.
             """
             
             self.add_user_message(analysis_prompt)
@@ -84,7 +83,17 @@ class SmartPresentationProcessor(BaseAgent):
                 arguments=arguments
             )
 
-            response_content = str(response.content) if hasattr(response, 'content') else str(response)
+            # Handle semantic kernel response
+            if hasattr(response, 'message'):
+                # New format: AgentResponseItem with message attribute
+                response_content = str(response.message.content) if hasattr(response.message, 'content') else str(response.message)
+            elif isinstance(response, list) and len(response) > 0:
+                # Old format: list of messages
+                last_message = response[-1]
+                response_content = str(last_message.content) if hasattr(last_message, 'content') else str(last_message)
+            else:
+                response_content = str(response)
+
             self.add_assistant_message(response_content)
             
             return self._validate_response(response_content, user_input)

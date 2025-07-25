@@ -1,0 +1,27 @@
+This is the Document Extraction API which will be utilized at our frontend.
+It requires bearer token. Currently is not needed but put here for reference for later
+POST API link: https://ams-ncsgpt-dev.azure-api.net/docprocess/call_by_base64_string?
+
+Example Request Body:
+{
+    "base64_string": "UEsDBBQAAAAIAC1RzVi...",
+    "type": "docx"
+}
+
+Example Response Body:
+{
+    "content": [
+        {
+            "type": "text",
+            "id": 0,
+            "text": "For images, please provide the additional information and meaning it provides in the context of the rest of the document, at the points where they appear, using natural language. Indicate it is an image and put the information of the image as an independent paragraph.\nFor images, explicitly indicate it is an image and describe visual elements and extract any visible text if present. \nJust describe everything as part of a coherent summary. \nPlease give the summarize by paragraph."
+        },
+        {
+            "type": "text",
+            "id": 1,
+            "description": "This is from uploaded file.",
+            "text": "This is a test file 123, and there is no real knowledge but spam for me to test on my document intelligence\n"
+        }
+    ],
+    "summary": ""
+}

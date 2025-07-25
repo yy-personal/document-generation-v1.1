@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python test:*)",
+      "Bash(python:*)",
+      "Bash(find:*)",
+      "Bash(rm:*)",
+      "Bash(mkdir:*)",
+      "WebFetch(domain:python-pptx.readthedocs.io)",
+      "Bash(del test_outline_structure.py)"
+    ],
+    "deny": []
+  }
+}

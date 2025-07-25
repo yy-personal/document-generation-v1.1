@@ -23,7 +23,15 @@ class PDFOrchestrator:
 
     def _parse_document_extraction(self, user_message: str) -> tuple:
         """Parse user message to extract document content and user input"""
-        if '[pdf_extraction]' in user_message:
+        # Support new simplified tag first
+        if '[document]' in user_message:
+            parts = user_message.split('[document]', 1)
+            user_input = parts[0].strip() if parts[0].strip() else None
+            document_content = parts[1].strip() if len(parts) > 1 and parts[1].strip() else None
+            return document_content, user_input, "auto"
+        
+        # Legacy support
+        elif '[pdf_extraction]' in user_message:
             parts = user_message.split('[pdf_extraction]', 1)
             user_input = parts[0].strip() if parts[0].strip() else None  # No default question
             document_content = parts[1].strip() if len(parts) > 1 and parts[1].strip() else None
@@ -43,7 +51,14 @@ class PDFOrchestrator:
             if message.get("role") == "user":
                 content = message.get("content", "")
                 
-                if '[pdf_extraction]' in content:
+                # Check for new simplified tag first
+                if '[document]' in content:
+                    parts = content.split('[document]', 1)
+                    if len(parts) > 1 and parts[1].strip():
+                        return parts[1].strip(), "auto"
+                
+                # Legacy support
+                elif '[pdf_extraction]' in content:
                     parts = content.split('[pdf_extraction]', 1)
                     if len(parts) > 1 and parts[1].strip():
                         return parts[1].strip(), "pdf"
