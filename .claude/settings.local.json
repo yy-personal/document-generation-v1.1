@@ -7,7 +7,18 @@
       "Bash(rm:*)",
       "Bash(mkdir:*)",
       "WebFetch(domain:python-pptx.readthedocs.io)",
-      "Bash(del test_outline_structure.py)"
+      "Bash(del test_outline_structure.py)",
+      "Bash(move:*)",
+      "Bash(mv:*)",
+      "Bash(pandoc:*)",
+      "Bash(echo $OS)",
+      "Bash(winget install:*)",
+      "Bash(where:*)",
+      "Bash(\"/c/Program Files/Pandoc/pandoc.exe\" --version)",
+      "Bash(ls:*)",
+      "Bash(curl:*)",
+      "Bash(tar:*)",
+      "Bash(cp:*)"
     ],
     "deny": []
   }
