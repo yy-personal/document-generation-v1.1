@@ -248,7 +248,7 @@ class PresentationStructureAgent(BaseAgent):
             "KEY_INSIGHT_SLIDE": ["Main finding", "Supporting evidence", "Implications"],
             "RECOMMENDATIONS_SLIDE": ["Action item 1", "Action item 2", "Next steps"],
             "CONCLUSION_SLIDE": ["Key takeaways", "Summary of insights", "Final thoughts"],
-            "THANK_YOU_SLIDE": ["Thank you", "Questions & Discussion"]
+            "THANK_YOU_SLIDE": ["Thank you"]
         }
         return content_outlines.get(slide_type, ["Key point 1", "Key point 2", "Key point 3"])
 

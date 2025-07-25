@@ -34,9 +34,10 @@ class PowerPointBuilderAgent(BaseAgent):
         super().__init__()
     
     def _set_16_9_aspect_ratio(self, prs: Presentation):
-        """Set presentation to 16:9 aspect ratio"""
+        """Set presentation to 16:9 aspect ratio - STRICTLY ENFORCED"""
         prs.slide_width = Inches(16)
         prs.slide_height = Inches(9)
+        print(f"Enforced 16:9 aspect ratio: {prs.slide_width.inches:.1f}\" x {prs.slide_height.inches:.1f}\"")
 
     async def process(self, slide_content: str, context_metadata: Optional[Dict[str, Any]] = None) -> bytes:
         """Generate PowerPoint file from slide content with template support"""
@@ -48,8 +49,9 @@ class PowerPointBuilderAgent(BaseAgent):
             if template_path:
                 print(f"Using template: {template_path}")
                 prs = Presentation(template_path)
-                print(f"Template dimensions: {prs.slide_width.inches:.1f}\" x {prs.slide_height.inches:.1f}\"")
-                # Don't override template aspect ratio - respect template design
+                print(f"Template original dimensions: {prs.slide_width.inches:.1f}\" x {prs.slide_height.inches:.1f}\"")
+                # ENFORCE 16:9 even with template for consistency
+                self._set_16_9_aspect_ratio(prs)
             else:
                 print("Using python-pptx default template (no custom design)")
                 prs = Presentation()
@@ -241,20 +243,11 @@ class PowerPointBuilderAgent(BaseAgent):
         content_placeholder = self._find_content_placeholder(slide)
         if content_placeholder:
             try:
-                # NCS Singapore specific content - concise format
-                ncs_content = content if content else [
-                    "Thank you",
-                    "NCS Singapore", 
-                    "Questions & Discussion"
-                ]
-                
-                content_list = ncs_content if isinstance(ncs_content, list) else [ncs_content]
-                
-                # Simple text assignment - preserve template formatting
-                ending_text = '\n'.join(content_list[:4])
+                # FORCE: Always only "Thank you" regardless of AI-generated content
+                ending_text = "Thank you"
                 content_placeholder.text = ending_text
                 self._apply_smart_text_formatting(content_placeholder, ending_text)
-                print(f"Set NCS ending slide content")
+                print(f"Set NCS ending slide content: '{ending_text}'")
                 
             except Exception as e:
                 print(f"Error setting NCS ending content: {e}")
@@ -284,6 +277,17 @@ class PowerPointBuilderAgent(BaseAgent):
     def _format_any_slide_content(self, slide, content, slide_type):
         """SIMPLIFIED: Format any slide content with table detection and smart formatting"""
         content_placeholder = self._find_content_placeholder(slide)
+        
+        # SPECIAL HANDLING: For Thank You slide, remove content placeholder to avoid duplication
+        if slide_type == "THANK_YOU_SLIDE":
+            if content_placeholder:
+                try:
+                    # Remove the content placeholder entirely - only keep the title
+                    slide.shapes._spTree.remove(content_placeholder._element)
+                    print(f"Removed content placeholder from Thank You slide - title only")
+                except Exception as e:
+                    print(f"Error removing Thank You slide content placeholder: {e}")
+            return
         
         if content_placeholder and content:
             try:
@@ -435,11 +439,11 @@ class PowerPointBuilderAgent(BaseAgent):
             # Set vertical text alignment - center vertically within the text box
             text_frame.vertical_anchor = MSO_ANCHOR.TOP  # Options: TOP, MIDDLE, BOTTOM
             
-            # Set better margins for professional layout - move content away from edges
-            text_frame.margin_left = Inches(0.3)    # More space from left edge
-            text_frame.margin_right = Inches(0.3)   # More space from right edge  
-            text_frame.margin_top = Inches(0.4)     # Move content down from top
-            text_frame.margin_bottom = Inches(0.3)  # Space at bottom
+            # Optimized margins for 16:9 aspect ratio (16" x 9" slide)
+            text_frame.margin_left = Inches(0.4)    # Professional left margin
+            text_frame.margin_right = Inches(0.4)   # Balanced right margin  
+            text_frame.margin_top = Inches(0.3)     # Clean top spacing
+            text_frame.margin_bottom = Inches(0.4)  # Adequate bottom spacing
             
             # Set a good starting font size - let auto-fit adjust as needed
             char_count = len(content_text.strip())
@@ -608,19 +612,19 @@ class PowerPointBuilderAgent(BaseAgent):
             cols = table_info["cols"] 
             data = table_info["data"]
             
-            # Position table in the content area
-            left = Inches(1)
-            top = Inches(2) 
-            width = Inches(14)  # 16:9 slide width minus margins
-            height = Inches(5)
+            # Position table optimally for 16:9 aspect ratio (16" x 9" slide)
+            left = Inches(0.8)     # Start closer to left edge
+            top = Inches(2.2)      # Below title area
+            width = Inches(14.4)   # Almost full width (16" - 0.8" left - 0.8" right)
+            height = Inches(5.5)   # Good height for 16:9 ratio
             
             # Add table shape
             table_shape = slide.shapes.add_table(rows, cols, left, top, width, height)
             table = table_shape.table
             
-            # Set column widths for better layout
-            table.columns[0].width = Inches(6)   # First column (labels)
-            table.columns[1].width = Inches(8)   # Second column (values)
+            # Set column widths optimized for 16:9 ratio and readability
+            table.columns[0].width = Inches(6.0)   # First column (labels) - slightly larger
+            table.columns[1].width = Inches(8.4)   # Second column (values) - use remaining space
             
             # Fill table with data
             for row_idx, row_data in enumerate(data):

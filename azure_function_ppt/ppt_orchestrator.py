@@ -114,17 +114,29 @@ class PowerPointOrchestrator:
     async def _extract_document_content(self, content: str) -> str:
         """Step 2: Extract and organize document content"""
         try:
+            print(f"[STEP 2] Document content extraction - Input length: {len(content)} chars")
             extractor = self._get_agent("DocumentContentExtractor")
             if not extractor:
+                print("[STEP 2] WARNING: DocumentContentExtractor not available, using raw content")
                 return content
-            return await extractor.process(content)
+            
+            extracted = await extractor.process(content)
+            print(f"[STEP 2] Extraction complete - Output length: {len(extracted)} chars")
+            
+            # Validate extracted content structure
+            if not extracted or len(extracted.strip()) < 50:
+                print("[STEP 2] WARNING: Extracted content too short, using original")
+                return content
+                
+            return extracted
         except Exception as e:
-            print(f"Content extraction error: {str(e)}")
+            print(f"[STEP 2] Content extraction error: {str(e)}")
             return content
 
     async def _create_presentation_structure(self, extracted_content: str) -> Dict[str, Any]:
         """Step 3: Content analysis + slide planning + structure creation"""
         try:
+            print(f"[STEP 3] Creating presentation structure - Input length: {len(extracted_content)} chars")
             structure_agent = self._get_agent("PresentationStructureAgent")
             if not structure_agent:
                 raise Exception("PresentationStructureAgent not available")
@@ -134,10 +146,29 @@ class PowerPointOrchestrator:
             if structure_result.startswith('```json'):
                 structure_result = structure_result.replace('```json', '').replace('```', '').strip()
             
-            return json.loads(structure_result)
+            parsed_structure = json.loads(structure_result)
+            
+            # Validate structure
+            slide_planning = parsed_structure.get("slide_planning", {})
+            presentation_structure = parsed_structure.get("presentation_structure", [])
+            
+            optimal_slides = slide_planning.get("optimal_slides", 0)
+            print(f"[STEP 3] Structure created - {optimal_slides} slides planned, {len(presentation_structure)} slides in structure")
+            
+            # Validation checks
+            if optimal_slides == 0 or len(presentation_structure) == 0:
+                print("[STEP 3] WARNING: Invalid structure detected")
+                
+            for i, slide in enumerate(presentation_structure[:3]):  # Check first 3 slides
+                slide_type = slide.get("slide_type", "UNKNOWN")
+                title = slide.get("title", "")
+                content_outline = slide.get("content_outline", [])
+                print(f"[STEP 3] Slide {i+1}: {slide_type} - '{title}' - {len(content_outline)} content items")
+            
+            return parsed_structure
             
         except (json.JSONDecodeError, Exception) as e:
-            print(f"Structure creation error: {str(e)}")
+            print(f"[STEP 3] Structure creation error: {str(e)}")
             return {
                 "slide_planning": {"optimal_slides": 10, "reasoning": "Fallback - using standard 10 slides"},
                 "presentation_structure": []
@@ -146,21 +177,57 @@ class PowerPointOrchestrator:
     async def _generate_slide_content(self, structure_data: Dict[str, Any]) -> str:
         """Step 4: Generate detailed slide content"""
         try:
+            presentation_structure = structure_data.get("presentation_structure", [])
+            print(f"[STEP 4] Generating slide content - {len(presentation_structure)} slides to process")
+            
             content_generator = self._get_agent("SlideContentGenerator")
             if not content_generator:
-                return json.dumps(structure_data.get("presentation_structure", []))
+                print("[STEP 4] WARNING: SlideContentGenerator not available, using structure as-is")
+                return json.dumps(presentation_structure)
                 
             # Pass the full structure data to SlideContentGenerator, not just the structure array
             structure_json = json.dumps(structure_data)
-            return await content_generator.process(structure_json)
+            generated_content = await content_generator.process(structure_json)
+            
+            # Validate generated content
+            try:
+                parsed_content = json.loads(generated_content)
+                if isinstance(parsed_content, list):
+                    print(f"[STEP 4] Content generation complete - {len(parsed_content)} slides generated")
+                    
+                    # Check first few slides for quality
+                    for i, slide in enumerate(parsed_content[:3]):
+                        title = slide.get("title", "")
+                        content = slide.get("content", [])
+                        layout = slide.get("layout", "")
+                        print(f"[STEP 4] Generated Slide {i+1}: '{title}' ({layout}) - {len(content)} content items")
+                        
+                        if len(content) == 0:
+                            print(f"[STEP 4] WARNING: Slide {i+1} has no content")
+                else:
+                    print("[STEP 4] WARNING: Generated content is not a list format")
+                    
+            except json.JSONDecodeError:
+                print("[STEP 4] WARNING: Generated content is not valid JSON")
+            
+            return generated_content
             
         except Exception as e:
-            print(f"Content generation error: {str(e)}")
+            print(f"[STEP 4] Content generation error: {str(e)}")
             return json.dumps(structure_data.get("presentation_structure", []))
 
     async def _build_powerpoint_file(self, slide_content: str, session_id: str) -> bytes:
         """Step 5: Build actual PowerPoint file"""
         try:
+            print(f"[STEP 5] Building PowerPoint file - Session: {session_id}")
+            
+            # Validate input
+            try:
+                parsed_slides = json.loads(slide_content)
+                print(f"[STEP 5] Processing {len(parsed_slides)} slides for PowerPoint generation")
+            except json.JSONDecodeError:
+                print("[STEP 5] WARNING: Invalid JSON input for PowerPoint builder")
+                
             builder_agent = self._get_agent("PowerPointBuilderAgent")
             if not builder_agent:
                 raise Exception("PowerPointBuilderAgent not available")
@@ -169,11 +236,15 @@ class PowerPointOrchestrator:
             ppt_data = await builder_agent.process(slide_content, context_metadata)
             
             if isinstance(ppt_data, str):
-                return base64.b64decode(ppt_data)
+                decoded_data = base64.b64decode(ppt_data)
+                print(f"[STEP 5] PowerPoint file generated - Size: {len(decoded_data)} bytes")
+                return decoded_data
+            
+            print(f"[STEP 5] PowerPoint file generated - Size: {len(ppt_data)} bytes")
             return ppt_data
             
         except Exception as e:
-            print(f"PowerPoint building error: {str(e)}")
+            print(f"[STEP 5] PowerPoint building error: {str(e)}")
             raise Exception(f"Failed to generate PowerPoint file: {str(e)}")
 
     def _provide_capabilities_info(self) -> str:
@@ -232,13 +303,18 @@ class PowerPointOrchestrator:
                         print(f"Found previous {file_type} document")
 
             if document_content:
+                print(f"[PIPELINE] Document detected - Length: {len(document_content)} chars, Type: {file_type}")
                 has_previous_document = document_content != self._parse_document_extraction(user_message)[0]
                 
                 if clean_user_input is None:
                     clean_user_input = "Create a professional presentation from this document"
+                    
+                print(f"[PIPELINE] User input: '{clean_user_input}'")
                 
                 # STEP 1: Intent analysis only (no slide count)
+                print("[STEP 1] Starting intent analysis")
                 intent_result = await self._analyze_intent(clean_user_input, has_previous_document)
+                print(f"[STEP 1] Intent determined: {intent_result.get('intent', 'UNKNOWN')}")
                 user_intent = intent_result.get("intent", "CREATE_PRESENTATION")
                 
                 if user_intent == "INFORMATION_REQUEST":

@@ -30,6 +30,7 @@ class SlideContentGenerator(BaseAgent):
         CRITICAL REQUIREMENTS:
         - **STAY TRUE TO SOURCE**: All content must be directly derived from the provided structure
         - **NO GENERIC CONTENT**: Never create generic business content or placeholder text
+        - **DESCRIPTIVE TITLES**: Create specific, descriptive titles that reflect the actual content, not generic labels
         - **MATCH STRUCTURE**: Follow the exact slide structure and topics provided
         - **USE ACTUAL DATA**: Include specific details, numbers, dates from the source material
 
@@ -49,24 +50,32 @@ class SlideContentGenerator(BaseAgent):
         4. **Maintain Accuracy**: Ensure all information is factually correct from source
 
         OUTPUT FORMAT (JSON only, no markdown):
-        Generate slide content in JSON format exactly matching the provided structure:
+        Generate slide content in JSON format with descriptive, content-specific titles:
 
         [
           {
-            "title": "Exact Title from Structure",
+            "title": "Digital Transformation Strategy 2025-2030",
             "content": [
               "Content item 1 (no manual bullets - PowerPoint handles this)",
               "Content item 2 (for multiple points)", 
               "Content item 3 (when appropriate)"
             ],
-            "layout": "SLIDE_TYPE_FROM_STRUCTURE"
+            "layout": "TITLE_SLIDE"
           },
           {
-            "title": "Overview Example",
+            "title": "Technology Infrastructure Modernization",
             "content": [
-              "This project represents a comprehensive modernization effort designed to enhance our core technology platform and improve user experience across all digital touchpoints."
+              "This initiative focuses on upgrading legacy systems to cloud-native architecture, improving scalability and reducing operational costs by 40%."
             ],
             "layout": "OVERVIEW_SLIDE"
+          },
+          {
+            "title": "Current State: System Fragmentation Challenges",
+            "content": [
+              "Analysis of existing technology landscape reveals 47 legacy systems requiring integration",
+              "Data silos prevent comprehensive business intelligence across departments"
+            ],
+            "layout": "ANALYSIS_SLIDE"
           }
         ]
 
@@ -128,7 +137,12 @@ class SlideContentGenerator(BaseAgent):
             - Use appropriate content format based on slide type and content nature:
               * BULLET FORMAT: For lists, key points, multiple items (2-6 items)
               * PARAGRAPH FORMAT: For explanations, descriptions, single concepts
-            - Use the exact slide titles from the structure where content exists  
+            - **OPTIMIZE TITLES**: Replace generic titles with specific, descriptive ones:
+              * "Analysis" → "Current State: Technology Infrastructure Challenges"
+              * "Objectives" → "Strategic Goals: Cloud Migration & Automation"
+              * "Process" → "Implementation Roadmap: 5-Phase Approach"
+              * "Results" → "Expected Outcomes: 40% Cost Reduction"
+              * "Overview" → "[Specific Topic]: Key Initiative Overview"
             - Use the exact slide types (slide_type field) from the structure
             - EXPAND SPARSE CONTENT: When content_outline is brief, create detailed explanatory content that maintains relevance to the source
             - For sparse content, focus on:
@@ -144,7 +158,7 @@ class SlideContentGenerator(BaseAgent):
             - Overview slides: Use paragraph format for narrative explanation
             - Analysis/Process slides: Use bullet format for multiple points
             - Conclusion/Summary: Use bullet format for key takeaways
-            - Thank You slides: Keep concise - maximum 3 brief items
+            - Thank You slides: Only "Thank you" text - no additional content
             - DON'T add manual bullet symbols (•) - PowerPoint will handle bullets automatically
             
             OUTPUT: Valid JSON array with slides exactly matching the structure provided.
