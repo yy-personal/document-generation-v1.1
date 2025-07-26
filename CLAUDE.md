@@ -4,30 +4,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a document generation system with two independent Azure Functions services. The system processes PDF/Word documents using AI agents to generate either PDF analysis reports or PowerPoint presentations.
+This is a document generation system with three independent Azure Functions services. The system processes PDF/Word documents using AI agents to generate either PDF analysis reports or PowerPoint presentations.
 
 ### Architecture
 
-The project consists of two main services:
+The project consists of three main services:
 
 1. **PDF Processing Service** (`azure_function_pdf/`) - Converts documents to PDF reports with strategic analysis
-2. **PowerPoint Generation Service** (`azure_function_ppt/`) - Creates business presentations from documents
+2. **PowerPoint Generation Service v1** (`azure_function_ppt/`) - Creates business presentations using python-pptx
+3. **PowerPoint Generation Service v2** (`azure_function_ppt_v2/`) - Next-generation conversational PowerPoint service using PptxGenJS
 
 ## Development Commands
 
-### Azure Functions (PDF and PowerPoint services)
+### Azure Functions Services
 
+#### Python Services (PDF and PowerPoint v1)
 ```bash
 # Install dependencies for PDF service
 cd azure_function_pdf
 pip install -r requirements.txt
 
-# Install dependencies for PowerPoint service
+# Install dependencies for PowerPoint service v1
 cd azure_function_ppt  
 pip install -r requirements.txt
 
-# Run either service locally (requires Azure Functions Core Tools)
+# Run either Python service locally (requires Azure Functions Core Tools)
 func start  # Runs on localhost:7071
+```
+
+#### Node.js Service (PowerPoint v2)
+```bash
+# Install dependencies for PowerPoint service v2
+cd azure_function_ppt_v2
+npm install
+
+# Run Node.js service locally (requires Azure Functions Core Tools)
+npm start  # Runs on localhost:7071
 ```
 
 ### Service Testing
@@ -47,13 +59,23 @@ Each service can be tested independently:
 - **Processing time**: 2-6 seconds depending on pipeline
 - **Output**: Professional PDF reports with strategic analysis
 
-### PowerPoint Generation Service (azure_function_ppt/)
+### PowerPoint Generation Service v1 (azure_function_ppt/)
 - **Endpoint**: `/api/powerpoint_generation`
 - **Pipeline**: 4 AI agents + 1 rule-based builder (SmartPresentationProcessor → DocumentContentExtractor → PresentationStructureAgent → SlideContentGenerator → PowerPointBuilderAgent)
 - **Output**: Content-driven presentations (3-30 slides) with 16:9 format
 - **Processing time**: 12-15 seconds
 - **Key Feature**: Smart slide count determination based on content complexity
 - **Theme**: Purple (#584dc1) and Gold (#d1b95b) color scheme
+- **Technology**: Python with python-pptx library
+
+### PowerPoint Generation Service v2 (azure_function_ppt_v2/)
+- **Endpoint**: `/api/powerpointGeneration`
+- **Pipeline**: 5 AI agents (ConversationManager → DocumentProcessor → SlideEstimator → ContentStructurer → PptxGenerator)
+- **Output**: Conversational PowerPoint generation with enhanced formatting
+- **Processing time**: Variable based on conversation complexity
+- **Key Feature**: Multi-turn conversations for iterative presentation refinement
+- **Technology**: Node.js with PptxGenJS library (in development)
+- **Status**: Core agent pipeline complete, PptxGenJS integration pending
 
 ## Key Configuration Files
 
@@ -136,7 +158,8 @@ Both services use Semantic Kernel with specialized agents operating in sequentia
 
 ### API Testing Files
 - `azure_function_pdf/test_simplified.py` - Comprehensive PDF service testing with multiple scenarios
-- `azure_function_ppt/test_poc.py` - PowerPoint service testing including long document handling
+- `azure_function_ppt/test_poc.py` - PowerPoint v1 service testing including long document handling
+- `azure_function_ppt_v2/test/test-poc.js` - PowerPoint v2 conversational flow testing with Node.js
 - Each test script includes complete request/response validation
 
 ### Common Development Issues
@@ -171,26 +194,38 @@ python-pptx>=0.6.23     # PowerPoint service only
 ```
 
 ### Testing Dependencies
-Test scripts use standard Python libraries:
+
+**Python Services:**
 - `requests` for HTTP API calls
 - `json` for request/response handling  
 - `asyncio` for async operations (PDF service)
 - `time` for performance measurement
+
+**Node.js Service (PowerPoint v2):**
+- `@azure/functions` for Azure Functions runtime
+- `pptxgenjs` for PowerPoint generation (in development)
+- `openai` for OpenAI API integration
+- `dotenv` for environment variable management
 
 ## Project Structure Understanding
 
 ### Service Separation
 - Each Azure Function service is completely independent and self-contained
 - Services share no code or dependencies between them
-- Each has its own config.py with service-specific agent configurations
+- Python services have config.py files, Node.js service has config.js
 - Services can be developed, tested, and deployed independently
-- Only one service can run locally at a time (both use port 7071)
+- Only one service can run locally at a time (all use port 7071)
+- PowerPoint v2 service uses different technology stack (Node.js vs Python)
 
 ### Agent Pattern
-- All agents inherit from `core/base_agent.py`
+- **Python services**: All agents inherit from `core/base_agent.py`
+- **Node.js service**: All agents inherit from `baseAgent.js`
 - Agents are stateless and operate in defined pipelines
-- Configuration is centralized in each service's `config.py`
-- Orchestrators (`pdf_orchestrator.py`, `ppt_orchestrator.py`) manage pipeline execution
+- Configuration is centralized (Python: `config.py`, Node.js: `config.js`)
+- Orchestrators manage pipeline execution:
+  - `pdf_orchestrator.py` (PDF service)
+  - `ppt_orchestrator.py` (PowerPoint v1)
+  - `pptOrchestrator.js` (PowerPoint v2)
 
 ## Service Testing and Usage
 
@@ -221,8 +256,22 @@ Test scenarios include:
 - User instruction processing
 - Content-driven slide count optimization
 
+### PowerPoint Service v2 Testing (`azure_function_ppt_v2/test/test-poc.js`)
+```bash
+cd azure_function_ppt_v2
+npm start &  # Start service in background
+npm test  # Run conversational flow tests
+```
+
+Test scenarios include:
+- Document upload with clarifying questions
+- Multi-turn conversations for context building
+- Slide count estimation and user feedback
+- Presentation generation requests
+- Session and conversation history management
+
 ### Direct API Usage
-Both services accept POST requests with JSON payloads:
+All services accept POST requests with JSON payloads:
 
 **PDF Service** (`/api/pdf_processing`):
 ```json
@@ -234,11 +283,21 @@ Both services accept POST requests with JSON payloads:
 }
 ```
 
-**PowerPoint Service** (`/api/powerpoint_generation`):
+**PowerPoint Service v1** (`/api/powerpoint_generation`):
 ```json
 {
   "user_message": "Create presentation[document]base64_content", 
   "entra_id": "user-id"
+}
+```
+
+**PowerPoint Service v2** (`/api/powerpointGeneration`):
+```json
+{
+  "user_message": "What kind of presentation works best? [document]base64_content",
+  "entra_id": "user-id",
+  "session_id": "optional-session-id",
+  "conversation_history": []
 }
 ```
 
