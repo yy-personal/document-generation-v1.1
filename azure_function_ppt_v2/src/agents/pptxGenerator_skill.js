@@ -138,7 +138,7 @@ class PptxGenerator extends BaseAgent {
         // Apply background and theme
         slide.background = { color: 'FFFFFF' };
 
-        switch (slideData.layout_type) {
+        switch (slideData.layout) {
             case 'TITLE_SLIDE':
                 this.createTitleSlide(slide, slideData);
                 break;
@@ -148,6 +148,7 @@ class PptxGenerator extends BaseAgent {
                 break;
                 
             case 'CONTENT_SLIDE':
+            case 'OVERVIEW_SLIDE':
                 this.createContentSlide(slide, slideData);
                 break;
                 
@@ -233,13 +234,17 @@ class PptxGenerator extends BaseAgent {
         });
 
         // Agenda items as bullet points
-        if (slideData.content && slideData.content.length > 0) {
-            const bulletText = slideData.content.map(item => `• ${item}`).join('\n');
-            slide.addText(bulletText, {
+        const bullets = this.extractBullets(slideData);
+        if (bullets && bullets.length > 0) {
+            const bulletTextArray = bullets.map(item => ({
+                text: item,
+                options: { bullet: true, fontSize: 18, color: '333333' }
+            }));
+            
+            slide.addText(bulletTextArray, {
                 x: 1.5, y: 1.5, w: 7, h: 3.5,
-                fontSize: 18,
-                color: '333333',
-                valign: 'top'
+                valign: 'top',
+                lineSpacingMultiple: 1.3
             });
         }
     }
@@ -257,14 +262,17 @@ class PptxGenerator extends BaseAgent {
         });
 
         // Content as bullet points
-        if (slideData.content && slideData.content.length > 0) {
-            const bulletText = slideData.content.map(item => `• ${item}`).join('\n\n');
-            slide.addText(bulletText, {
+        const bullets = this.extractBullets(slideData);
+        if (bullets && bullets.length > 0) {
+            const bulletTextArray = bullets.map(item => ({
+                text: item,
+                options: { bullet: true, fontSize: 16, color: '333333' }
+            }));
+            
+            slide.addText(bulletTextArray, {
                 x: 1.5, y: 1.5, w: 7, h: 3.5,
-                fontSize: 16,
-                color: '333333',
                 valign: 'top',
-                lineSpacing: 1.2
+                lineSpacingMultiple: 1.4
             });
         }
     }
@@ -282,12 +290,9 @@ class PptxGenerator extends BaseAgent {
         });
 
         // Table content
-        if (slideData.table_data && slideData.table_data.length > 0) {
-            const tableRows = slideData.table_data.map(row => {
-                return Array.isArray(row) ? row : [row];
-            });
-
-            slide.addTable(tableRows, {
+        const tableData = this.extractTableData(slideData);
+        if (tableData && tableData.length > 0) {
+            slide.addTable(tableData, {
                 x: 1, y: 1.5, w: 8, h: 3,
                 fontSize: 14,
                 color: '333333',
@@ -311,33 +316,34 @@ class PptxGenerator extends BaseAgent {
             bold: true
         });
 
+        // Extract column data
+        const columnData = this.extractColumnData(slideData);
+        
         // Left column
-        if (slideData.left_content) {
-            const leftText = Array.isArray(slideData.left_content) 
-                ? slideData.left_content.map(item => `• ${item}`).join('\n\n')
-                : slideData.left_content;
-                
-            slide.addText(leftText, {
+        if (columnData.left && columnData.left.length > 0) {
+            const leftTextArray = columnData.left.map(item => ({
+                text: item,
+                options: { bullet: true, fontSize: 14, color: '333333' }
+            }));
+            
+            slide.addText(leftTextArray, {
                 x: 1, y: 1.5, w: 3.8, h: 3.5,
-                fontSize: 14,
-                color: '333333',
                 valign: 'top',
-                lineSpacing: 1.2
+                lineSpacingMultiple: 1.3
             });
         }
 
         // Right column
-        if (slideData.right_content) {
-            const rightText = Array.isArray(slideData.right_content)
-                ? slideData.right_content.map(item => `• ${item}`).join('\n\n')
-                : slideData.right_content;
-                
-            slide.addText(rightText, {
+        if (columnData.right && columnData.right.length > 0) {
+            const rightTextArray = columnData.right.map(item => ({
+                text: item,
+                options: { bullet: true, fontSize: 14, color: '333333' }
+            }));
+            
+            slide.addText(rightTextArray, {
                 x: 5.2, y: 1.5, w: 3.8, h: 3.5,
-                fontSize: 14,
-                color: '333333',
                 valign: 'top',
-                lineSpacing: 1.2
+                lineSpacingMultiple: 1.3
             });
         }
     }
@@ -384,14 +390,17 @@ class PptxGenerator extends BaseAgent {
         });
 
         // Key takeaways
-        if (slideData.key_takeaways && slideData.key_takeaways.length > 0) {
-            const takeawaysText = slideData.key_takeaways.map((item, index) => `${index + 1}. ${item}`).join('\n\n');
-            slide.addText(takeawaysText, {
+        const bullets = this.extractBullets(slideData);
+        if (bullets && bullets.length > 0) {
+            const takeawaysTextArray = bullets.map((item, index) => ({
+                text: `${index + 1}. ${item}`,
+                options: { fontSize: 16, color: '333333' }
+            }));
+            
+            slide.addText(takeawaysTextArray, {
                 x: 1.5, y: 1.5, w: 7, h: 3.5,
-                fontSize: 16,
-                color: '333333',
                 valign: 'top',
-                lineSpacing: 1.3
+                lineSpacingMultiple: 1.4
             });
         }
     }
@@ -409,15 +418,76 @@ class PptxGenerator extends BaseAgent {
             align: 'center'
         });
 
-        // Contact info or additional message
-        if (slideData.message) {
-            slide.addText(slideData.message, {
-                x: 1, y: 3.5, w: 8, h: 1,
-                fontSize: 18,
-                color: '666666',
-                align: 'center'
+        // Additional content from bullets
+        const bullets = this.extractBullets(slideData);
+        if (bullets && bullets.length > 0) {
+            const bulletTextArray = bullets.map(item => ({
+                text: item,
+                options: { bullet: true, fontSize: 14, color: '666666' }
+            }));
+            
+            slide.addText(bulletTextArray, {
+                x: 1.5, y: 3.5, w: 7, h: 1.5,
+                valign: 'top',
+                lineSpacingMultiple: 1.2
             });
         }
+    }
+
+    /**
+     * Extract bullets from slide data based on content structure
+     */
+    extractBullets(slideData) {
+        if (!slideData.content) return [];
+
+        // Handle different content structures
+        if (slideData.content.bullets && Array.isArray(slideData.content.bullets)) {
+            return slideData.content.bullets;
+        }
+        
+        // Fallback for direct content array
+        if (Array.isArray(slideData.content)) {
+            return slideData.content;
+        }
+        
+        return [];
+    }
+
+    /**
+     * Extract table data from slide data
+     */
+    extractTableData(slideData) {
+        if (!slideData.content || !slideData.content.table) return [];
+
+        const table = slideData.content.table;
+        const tableRows = [];
+
+        // Add headers if present
+        if (table.headers && Array.isArray(table.headers)) {
+            tableRows.push(table.headers);
+        }
+
+        // Add data rows
+        if (table.rows && Array.isArray(table.rows)) {
+            tableRows.push(...table.rows);
+        }
+
+        return tableRows;
+    }
+
+    /**
+     * Extract column data for two-column slides
+     */
+    extractColumnData(slideData) {
+        if (!slideData.content || !slideData.content.columns) {
+            return { left: [], right: [] };
+        }
+
+        const columns = slideData.content.columns;
+        return {
+            left: Array.isArray(columns.left) ? columns.left : [],
+            right: Array.isArray(columns.right) ? columns.right : []
+        };
     }
 
     /**

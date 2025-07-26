@@ -17,7 +17,9 @@
       "Bash(npm run restart:*)",
       "Bash(timeout 60s npm test)",
       "Bash(node:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:gitbrent.github.io)"
     ],
     "deny": []
   }
