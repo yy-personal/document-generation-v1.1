@@ -1,0 +1,23 @@
+{
+  "name": "powerpoint-generation-v2",
+  "version": "1.0.0",
+  "description": "PowerPoint Generation Service v2 using PptxGenJS",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "npx func start",
+    "test": "node test/test-poc.js",
+    "func": "npx func"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0",
+    "pptxgenjs": "^3.12.0",
+    "openai": "^4.0.0",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "azure-functions-core-tools": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

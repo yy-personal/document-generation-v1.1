@@ -1,0 +1,209 @@
+const { 
+    AGENT_PIPELINE, 
+    QUICK_RESPONSE_PIPELINE,
+    generateSessionId 
+} = require('../config/config');
+
+// Import agents (will be created next)
+const { ConversationManager } = require('../agents/conversationManager');
+const { DocumentProcessor } = require('../agents/documentProcessor');
+const { SlideEstimator } = require('../agents/slideEstimator');
+const { ContentStructurer } = require('../agents/contentStructurer');
+const { PptxGenerator } = require('../agents/pptxGenerator');
+
+class PowerPointOrchestrator {
+    constructor() {
+        this.agents = {
+            ConversationManager: new ConversationManager(),
+            DocumentProcessor: new DocumentProcessor(),
+            SlideEstimator: new SlideEstimator(),
+            ContentStructurer: new ContentStructurer(),
+            PptxGenerator: new PptxGenerator()
+        };
+        
+        this.conversationHistory = new Map(); // Store conversation history by session
+    }
+
+    async processConversationRequest(requestData) {
+        try {
+            console.log('Processing conversation request:', {
+                hasMessage: !!requestData.user_message,
+                sessionId: requestData.session_id,
+                hasHistory: !!requestData.conversation_history
+            });
+
+            // Extract request data
+            const {
+                user_message,
+                entra_id,
+                session_id,
+                conversation_history = []
+            } = requestData;
+
+            // Generate or use existing session ID
+            const sessionId = session_id || generateSessionId();
+
+            // Initialize response structure
+            const response = {
+                response_data: {
+                    status: 'processing',
+                    session_id: sessionId,
+                    conversation_history: conversation_history,
+                    pipeline_info: [],
+                    processing_info: {},
+                    response_text: '',
+                    powerpoint_output: null
+                }
+            };
+
+            // Step 1: Conversation Management
+            console.log('Step 1: Processing conversation with ConversationManager');
+            const conversationResult = await this.agents.ConversationManager.process({
+                user_message,
+                session_id: sessionId,
+                conversation_history,
+                entra_id
+            });
+
+            response.response_data.pipeline_info.push('ConversationManager');
+            response.response_data.processing_info.conversation = conversationResult;
+
+            // Update conversation history
+            const updatedHistory = [...conversation_history, {
+                role: 'user',
+                content: user_message,
+                timestamp: new Date().toISOString()
+            }];
+
+            // Determine if this is a generation request or just conversation
+            const shouldGeneratePresentation = conversationResult.should_generate_presentation;
+            const hasDocumentContent = conversationResult.has_document_content;
+
+            if (!shouldGeneratePresentation) {
+                // Quick response - just conversation management and slide estimation
+                console.log('Quick response mode - no presentation generation requested');
+                
+                if (hasDocumentContent) {
+                    // Provide slide estimate if document is present
+                    const slideEstimate = await this.agents.SlideEstimator.process({
+                        document_content: conversationResult.document_content,
+                        user_context: conversationResult.user_context
+                    });
+                    
+                    response.response_data.pipeline_info.push('SlideEstimator');
+                    response.response_data.processing_info.slide_estimate = slideEstimate;
+                    response.response_data.response_text = this.formatConversationResponse(conversationResult, slideEstimate);
+                } else {
+                    response.response_data.response_text = conversationResult.response_text;
+                }
+
+                // Add assistant response to history
+                updatedHistory.push({
+                    role: 'assistant',
+                    content: response.response_data.response_text,
+                    timestamp: new Date().toISOString()
+                });
+
+                response.response_data.conversation_history = updatedHistory;
+                response.response_data.status = 'completed';
+                return response;
+            }
+
+            // Full pipeline - generate presentation
+            console.log('Full pipeline mode - generating presentation');
+
+            if (!hasDocumentContent) {
+                throw new Error('Cannot generate presentation without document content');
+            }
+
+            // Step 2: Document Processing
+            console.log('Step 2: Processing document content');
+            const documentResult = await this.agents.DocumentProcessor.process({
+                document_content: conversationResult.document_content,
+                user_context: conversationResult.user_context
+            });
+
+            response.response_data.pipeline_info.push('DocumentProcessor');
+            response.response_data.processing_info.document_analysis = documentResult;
+
+            // Step 3: Slide Estimation
+            console.log('Step 3: Estimating slide count');
+            const slideEstimate = await this.agents.SlideEstimator.process({
+                document_content: conversationResult.document_content,
+                processed_content: documentResult,
+                user_context: conversationResult.user_context
+            });
+
+            response.response_data.pipeline_info.push('SlideEstimator');
+            response.response_data.processing_info.slide_estimate = slideEstimate;
+
+            // Step 4: Content Structuring
+            console.log('Step 4: Structuring content for slides');
+            const structuredContent = await this.agents.ContentStructurer.process({
+                processed_content: documentResult,
+                slide_estimate: slideEstimate,
+                user_context: conversationResult.user_context
+            });
+
+            response.response_data.pipeline_info.push('ContentStructurer');
+            response.response_data.processing_info.content_structure = structuredContent;
+
+            // Step 5: PowerPoint Generation
+            console.log('Step 5: Generating PowerPoint file');
+            const pptxResult = await this.agents.PptxGenerator.process({
+                structured_content: structuredContent,
+                slide_estimate: slideEstimate,
+                session_id: sessionId
+            });
+
+            response.response_data.pipeline_info.push('PptxGenerator');
+            response.response_data.powerpoint_output = pptxResult;
+
+            // Prepare final response
+            response.response_data.response_text = this.formatGenerationResponse(slideEstimate, pptxResult);
+
+            // Add assistant response to history
+            updatedHistory.push({
+                role: 'assistant',
+                content: response.response_data.response_text,
+                timestamp: new Date().toISOString(),
+                powerpoint_generated: true
+            });
+
+            response.response_data.conversation_history = updatedHistory;
+            response.response_data.status = 'completed';
+
+            console.log('PowerPoint generation completed successfully');
+            return response;
+
+        } catch (error) {
+            console.error('Error in orchestrator:', error);
+            
+            return {
+                response_data: {
+                    status: 'error',
+                    session_id: requestData.session_id || 'unknown',
+                    error_message: error.message,
+                    pipeline_info: [],
+                    conversation_history: requestData.conversation_history || []
+                }
+            };
+        }
+    }
+
+    formatConversationResponse(conversationResult, slideEstimate = null) {
+        let response = conversationResult.response_text;
+        
+        if (slideEstimate) {
+            response += `\n\nBased on your document, I estimate this presentation would have approximately ${slideEstimate.estimated_slides} slides. When you're ready, click "Create Presentation" to generate the PowerPoint file.`;
+        }
+        
+        return response;
+    }
+
+    formatGenerationResponse(slideEstimate, pptxResult) {
+        return `✅ PowerPoint presentation generated successfully!\n\n📊 Presentation Details:\n- Slides: ${slideEstimate.estimated_slides}\n- File: ${pptxResult.filename}\n- Size: ${Math.round(pptxResult.file_size_kb)}KB\n\nYour presentation is ready for download.`;
+    }
+}
+
+module.exports = { PowerPointOrchestrator };

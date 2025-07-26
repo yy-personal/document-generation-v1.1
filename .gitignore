@@ -45,3 +45,4 @@ wheels/
 # OS
 .DS_Store
 Thumbs.db
+/azure_function_ppt_v2/node_modules
