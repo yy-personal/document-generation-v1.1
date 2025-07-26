@@ -19,7 +19,8 @@
       "Bash(node:*)",
       "Bash(pkill:*)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:gitbrent.github.io)"
+      "WebFetch(domain:gitbrent.github.io)",
+      "Bash(npm install:*)"
     ],
     "deny": []
   }

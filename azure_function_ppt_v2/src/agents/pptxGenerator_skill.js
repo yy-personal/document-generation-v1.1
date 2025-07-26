@@ -89,18 +89,21 @@ class PptxGenerator extends BaseAgent {
 
             // Set presentation properties
             pres.author = 'Document Generation System v2';
-            pres.company = 'AI Presentation Generator';
+            pres.company = 'NCS';
             pres.subject = 'Generated Presentation';
             pres.title = structuredContent.presentation_title || 'Generated Presentation';
+
+            // Define master slides based on company template
+            this.defineCompanyMasterSlides(pres);
 
             console.log(`[PptxGenerator] Creating ${structuredContent.total_slides} slides`);
 
             // Generate all slides based on structured content
             for (let i = 0; i < structuredContent.slides.length; i++) {
                 const slideData = structuredContent.slides[i];
-                console.log(`[PptxGenerator] Creating slide ${i + 1}: ${slideData.layout_type}`);
+                console.log(`[PptxGenerator] Creating slide ${i + 1}: ${slideData.layout}`);
                 
-                await this.createSlideWithPptxGenJS(pres, slideData, i + 1);
+                await this.createSlideWithMasterSlides(pres, slideData, i + 1);
             }
 
             // Generate filename
@@ -130,7 +133,347 @@ class PptxGenerator extends BaseAgent {
     }
 
     /**
-     * Create slides with PptxGenJS based on layout type and content
+     * Define company master slides based on template structure
+     */
+    defineCompanyMasterSlides(pres) {
+        console.log('[PptxGenerator] Defining NCS company master slides');
+
+        // Title Master Slide
+        pres.defineSlideMaster({
+            title: "NCS_TITLE_MASTER",
+            background: { color: "FFFFFF" },
+            margin: [0.75, 0.5, 0.75, 0.5],
+            objects: [
+                // Company branding line
+                { 
+                    line: { 
+                        x: 0.5, y: 5.4, w: 9, h: 0,
+                        line: { color: "0066CC", width: 3 }
+                    }
+                },
+                // Title placeholder
+                { 
+                    placeholder: {
+                        options: { 
+                            name: "title", 
+                            type: "title",
+                            x: 1, y: 2, w: 8, h: 1.5
+                        }
+                    }
+                },
+                // Subtitle placeholder
+                { 
+                    placeholder: {
+                        options: { 
+                            name: "subtitle", 
+                            type: "body",
+                            x: 1, y: 3.5, w: 8, h: 1
+                        }
+                    }
+                }
+            ],
+            slideNumber: { x: 9.2, y: 5.2, color: "666666", fontSize: 10 }
+        });
+
+        // Content Master Slide
+        pres.defineSlideMaster({
+            title: "NCS_CONTENT_MASTER",
+            background: { color: "FFFFFF" },
+            margin: [0.75, 0.5, 0.75, 0.5],
+            objects: [
+                // Company branding line
+                { 
+                    line: { 
+                        x: 0.5, y: 5.4, w: 9, h: 0,
+                        line: { color: "0066CC", width: 2 }
+                    }
+                },
+                // Company logo text
+                { 
+                    text: { 
+                        text: "NCS", 
+                        options: { 
+                            x: 8.5, y: 0.2, w: 1.2, h: 0.4,
+                            fontSize: 12, color: "0066CC", bold: true, align: "right"
+                        }
+                    }
+                },
+                // Title placeholder
+                { 
+                    placeholder: {
+                        options: { 
+                            name: "title", 
+                            type: "title",
+                            x: 1, y: 0.7, w: 8, h: 0.8
+                        }
+                    }
+                },
+                // Body placeholder
+                { 
+                    placeholder: {
+                        options: { 
+                            name: "body", 
+                            type: "body",
+                            x: 1.5, y: 1.7, w: 7, h: 3.5
+                        }
+                    }
+                }
+            ],
+            slideNumber: { x: 9.2, y: 5.2, color: "666666", fontSize: 10 }
+        });
+
+        // Two Column Master Slide
+        pres.defineSlideMaster({
+            title: "NCS_TWO_COLUMN_MASTER",
+            background: { color: "FFFFFF" },
+            margin: [0.75, 0.5, 0.75, 0.5],
+            objects: [
+                // Company branding line
+                { 
+                    line: { 
+                        x: 0.5, y: 5.4, w: 9, h: 0,
+                        line: { color: "0066CC", width: 2 }
+                    }
+                },
+                // Company logo text
+                { 
+                    text: { 
+                        text: "NCS", 
+                        options: { 
+                            x: 8.5, y: 0.2, w: 1.2, h: 0.4,
+                            fontSize: 12, color: "0066CC", bold: true, align: "right"
+                        }
+                    }
+                },
+                // Title placeholder
+                { 
+                    placeholder: {
+                        options: { 
+                            name: "title", 
+                            type: "title",
+                            x: 1, y: 0.7, w: 8, h: 0.8
+                        }
+                    }
+                },
+                // Left column placeholder
+                { 
+                    placeholder: {
+                        options: { 
+                            name: "left_content", 
+                            type: "body",
+                            x: 1, y: 1.7, w: 3.8, h: 3.5
+                        }
+                    }
+                },
+                // Right column placeholder
+                { 
+                    placeholder: {
+                        options: { 
+                            name: "right_content", 
+                            type: "body",
+                            x: 5.2, y: 1.7, w: 3.8, h: 3.5
+                        }
+                    }
+                }
+            ],
+            slideNumber: { x: 9.2, y: 5.2, color: "666666", fontSize: 10 }
+        });
+
+        // Thank You Master Slide
+        pres.defineSlideMaster({
+            title: "NCS_THANK_YOU_MASTER",
+            background: { color: "FFFFFF" },
+            margin: [0.75, 0.5, 0.75, 0.5],
+            objects: [
+                // Company branding line
+                { 
+                    line: { 
+                        x: 0.5, y: 5.4, w: 9, h: 0,
+                        line: { color: "0066CC", width: 2 }
+                    }
+                },
+                // Thank you text
+                { 
+                    text: { 
+                        text: "Thank You", 
+                        options: { 
+                            x: 1, y: 2, w: 8, h: 1.5,
+                            fontSize: 48, color: "0066CC", bold: true, align: "center"
+                        }
+                    }
+                },
+                // Content placeholder
+                { 
+                    placeholder: {
+                        options: { 
+                            name: "body", 
+                            type: "body",
+                            x: 1.5, y: 3.7, w: 7, h: 1.5
+                        }
+                    }
+                }
+            ],
+            slideNumber: { x: 9.2, y: 5.2, color: "666666", fontSize: 10 }
+        });
+    }
+
+    /**
+     * Create slides using defined master slides
+     */
+    createSlideWithMasterSlides(pres, slideData, slideNumber) {
+        // Map slide types to master slide names
+        const masterSlideMap = {
+            'TITLE_SLIDE': 'NCS_TITLE_MASTER',
+            'AGENDA_SLIDE': 'NCS_CONTENT_MASTER',
+            'CONTENT_SLIDE': 'NCS_CONTENT_MASTER',
+            'OVERVIEW_SLIDE': 'NCS_CONTENT_MASTER',
+            'TABLE_SLIDE': 'NCS_CONTENT_MASTER',
+            'TWO_COLUMN_SLIDE': 'NCS_TWO_COLUMN_MASTER',
+            'TEXT_BOX_SLIDE': 'NCS_CONTENT_MASTER',
+            'SUMMARY_SLIDE': 'NCS_CONTENT_MASTER',
+            'THANK_YOU_SLIDE': 'NCS_THANK_YOU_MASTER'
+        };
+
+        const masterName = masterSlideMap[slideData.layout] || 'NCS_CONTENT_MASTER';
+        
+        try {
+            // Add slide using master slide
+            const slide = pres.addSlide({ masterName: masterName });
+            
+            // Populate placeholders with content
+            this.populateMasterSlidePlaceholders(slide, slideData, slideNumber);
+            
+        } catch (error) {
+            console.warn(`[PptxGenerator] Failed to use master slide ${masterName}: ${error.message}`);
+            // Fallback to manual slide creation
+            this.createSlideWithPptxGenJS(pres, slideData, slideNumber);
+        }
+    }
+
+    /**
+     * Populate master slide placeholders with content
+     */
+    populateMasterSlidePlaceholders(slide, slideData, slideNumber) {
+        // Populate title placeholder
+        if (slideData.title) {
+            slide.addText(slideData.title, { 
+                placeholder: 'title',
+                fontSize: slideData.layout === 'TITLE_SLIDE' ? 36 : 24,
+                color: '0066CC',
+                bold: true,
+                align: slideData.layout === 'TITLE_SLIDE' ? 'center' : 'left'
+            });
+        }
+
+        // Populate content based on slide type
+        switch (slideData.layout) {
+            case 'TITLE_SLIDE':
+                this.populateTitleMasterSlide(slide, slideData);
+                break;
+                
+            case 'TWO_COLUMN_SLIDE':
+                this.populateTwoColumnMasterSlide(slide, slideData);
+                break;
+                
+            case 'TABLE_SLIDE':
+                this.populateTableMasterSlide(slide, slideData);
+                break;
+                
+            default:
+                this.populateContentMasterSlide(slide, slideData);
+        }
+    }
+
+    /**
+     * Populate title master slide
+     */
+    populateTitleMasterSlide(slide, slideData) {
+        const bullets = this.extractBullets(slideData);
+        if (bullets && bullets.length > 0) {
+            const subtitleText = bullets.join(' • ');
+            slide.addText(subtitleText, { 
+                placeholder: 'subtitle',
+                fontSize: 18,
+                color: '333333',
+                align: 'center'
+            });
+        }
+    }
+
+    /**
+     * Populate content master slide
+     */
+    populateContentMasterSlide(slide, slideData) {
+        const bullets = this.extractBullets(slideData);
+        if (bullets && bullets.length > 0) {
+            const bulletTextArray = bullets.map(item => ({
+                text: item,
+                options: { bullet: true, fontSize: 16, color: '333333' }
+            }));
+            
+            slide.addText(bulletTextArray, { 
+                placeholder: 'body',
+                lineSpacingMultiple: 1.5,
+                valign: 'top'
+            });
+        }
+    }
+
+    /**
+     * Populate two-column master slide
+     */
+    populateTwoColumnMasterSlide(slide, slideData) {
+        const columnData = this.extractColumnData(slideData);
+        
+        // Left column
+        if (columnData.left && columnData.left.length > 0) {
+            const leftTextArray = columnData.left.map(item => ({
+                text: item,
+                options: { bullet: true, fontSize: 14, color: '333333' }
+            }));
+            
+            slide.addText(leftTextArray, { 
+                placeholder: 'left_content',
+                lineSpacingMultiple: 1.4,
+                valign: 'top'
+            });
+        }
+
+        // Right column
+        if (columnData.right && columnData.right.length > 0) {
+            const rightTextArray = columnData.right.map(item => ({
+                text: item,
+                options: { bullet: true, fontSize: 14, color: '333333' }
+            }));
+            
+            slide.addText(rightTextArray, { 
+                placeholder: 'right_content',
+                lineSpacingMultiple: 1.4,
+                valign: 'top'
+            });
+        }
+    }
+
+    /**
+     * Populate table master slide
+     */
+    populateTableMasterSlide(slide, slideData) {
+        const tableData = this.extractTableData(slideData);
+        if (tableData && tableData.length > 0) {
+            slide.addTable(tableData, { 
+                placeholder: 'body',
+                fontSize: 14,
+                color: '333333',
+                border: { type: 'solid', color: '0066CC', pt: 1 },
+                fill: { color: 'F0F7FF' },
+                align: 'left',
+                valign: 'middle'
+            });
+        }
+    }
+
+    /**
+     * Create slides with PptxGenJS based on layout type and content (fallback method)
      */
     createSlideWithPptxGenJS(pres, slideData, slideNumber) {
         const slide = pres.addSlide();
