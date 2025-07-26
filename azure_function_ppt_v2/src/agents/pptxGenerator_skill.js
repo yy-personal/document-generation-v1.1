@@ -1,6 +1,8 @@
 const { BaseAgent } = require('./core/baseAgent');
 const { PPTX_CONFIG } = require('../config/config');
 const PptxGenJS = require('pptxgenjs');
+const fs = require('fs');
+const path = require('path');
 
 /**
  * PptxGenerator Agent
@@ -18,14 +20,11 @@ class PptxGenerator extends BaseAgent {
         const { structured_content, slide_estimate, session_id } = input;
 
         try {
-            // For now, return a placeholder response
-            // TODO: Implement full PptxGenJS integration in separate session
-            
             console.log('[PptxGenerator] Starting PowerPoint generation...');
             console.log(`[PptxGenerator] Processing ${structured_content.total_slides} slides`);
 
-            // Placeholder for PptxGenJS implementation
-            const result = await this.generatePowerPointPlaceholder(structured_content, session_id);
+            // Use actual PptxGenJS implementation
+            const result = await this.generateWithPptxGenJS(structured_content, session_id);
 
             console.log('[PptxGenerator] PowerPoint generation completed');
             return result;
@@ -73,62 +72,381 @@ class PptxGenerator extends BaseAgent {
     }
 
     /**
-     * Future method: Generate PowerPoint using PptxGenJS
-     * TODO: Implement in separate session
+     * Generate PowerPoint using PptxGenJS with comprehensive layout support
      */
     async generateWithPptxGenJS(structuredContent, sessionId) {
-        // Initialize PptxGenJS
-        const pres = new PptxGenJS();
+        try {
+            // Initialize PptxGenJS
+            const pres = new PptxGenJS();
+            
+            // Configure 16:9 widescreen presentation
+            pres.defineLayout({ 
+                name: 'LAYOUT_16x9', 
+                width: 10, 
+                height: 5.625 
+            });
+            pres.layout = 'LAYOUT_16x9';
+
+            // Set presentation properties
+            pres.author = 'Document Generation System v2';
+            pres.company = 'AI Presentation Generator';
+            pres.subject = 'Generated Presentation';
+            pres.title = structuredContent.presentation_title || 'Generated Presentation';
+
+            console.log(`[PptxGenerator] Creating ${structuredContent.total_slides} slides`);
+
+            // Generate all slides based on structured content
+            for (let i = 0; i < structuredContent.slides.length; i++) {
+                const slideData = structuredContent.slides[i];
+                console.log(`[PptxGenerator] Creating slide ${i + 1}: ${slideData.layout_type}`);
+                
+                await this.createSlideWithPptxGenJS(pres, slideData, i + 1);
+            }
+
+            // Generate filename
+            const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            const filename = `presentation_${sessionId}_${timestamp}.pptx`;
+
+            // Generate base64 output
+            console.log('[PptxGenerator] Generating PowerPoint file...');
+            const base64Data = await pres.write('base64');
+
+            // Save locally for testing (only in development)
+            await this.saveLocalCopy(pres, filename);
+
+            return {
+                ppt_data: base64Data,
+                filename: filename,
+                file_size_kb: Math.round(base64Data.length / 1024),
+                slide_count: structuredContent.total_slides,
+                generation_method: 'pptxgenjs',
+                message: 'PowerPoint presentation generated successfully with PptxGenJS'
+            };
+
+        } catch (error) {
+            console.error('[PptxGenerator] PptxGenJS generation failed:', error);
+            throw new Error(`PptxGenJS generation failed: ${error.message}`);
+        }
+    }
+
+    /**
+     * Create slides with PptxGenJS based on layout type and content
+     */
+    createSlideWithPptxGenJS(pres, slideData, slideNumber) {
+        const slide = pres.addSlide();
         
-        // Configure presentation settings
-        pres.layout = PPTX_CONFIG.layout;
-        pres.theme = PPTX_CONFIG.theme;
+        // Apply background and theme
+        slide.background = { color: 'FFFFFF' };
 
-        // TODO: Implement slide generation logic
-        // - Create title slide
-        // - Create agenda slide
-        // - Create content slides based on structured_content.slides
-        // - Apply proper formatting and positioning
-        // - Handle different content types (bullets, tables, two-column)
-        // - Apply company branding/templates
-
-        // Generate and return base64
-        // const base64 = await pres.writeFile({ outputType: 'base64' });
-        // return base64;
-
-        throw new Error('PptxGenJS integration not yet implemented');
+        switch (slideData.layout_type) {
+            case 'TITLE_SLIDE':
+                this.createTitleSlide(slide, slideData);
+                break;
+                
+            case 'AGENDA_SLIDE':
+                this.createAgendaSlide(slide, slideData);
+                break;
+                
+            case 'CONTENT_SLIDE':
+                this.createContentSlide(slide, slideData);
+                break;
+                
+            case 'TABLE_SLIDE':
+                this.createTableSlide(slide, slideData);
+                break;
+                
+            case 'TWO_COLUMN_SLIDE':
+                this.createTwoColumnSlide(slide, slideData);
+                break;
+                
+            case 'TEXT_BOX_SLIDE':
+                this.createTextBoxSlide(slide, slideData);
+                break;
+                
+            case 'SUMMARY_SLIDE':
+                this.createSummarySlide(slide, slideData);
+                break;
+                
+            case 'THANK_YOU_SLIDE':
+                this.createThankYouSlide(slide, slideData);
+                break;
+                
+            default:
+                // Default to content slide
+                this.createContentSlide(slide, slideData);
+        }
+        
+        // Add slide number
+        if (slideNumber > 1) {
+            slide.addText(`${slideNumber}`, {
+                x: 9.2, y: 5.2, w: 0.5, h: 0.3,
+                fontSize: 10,
+                color: '666666',
+                align: 'right'
+            });
+        }
     }
 
     /**
-     * Future method: Apply PptxGenJS formatting based on slide layout
-     * TODO: Implement in separate session
+     * Create title slide layout
      */
-    createSlideWithPptxGenJS(pres, slideData) {
-        // TODO: Implement slide creation logic based on layout type
-        // - TITLE_SLIDE: Create title and subtitle
-        // - CONTENT_SLIDE: Create bullet points
-        // - TABLE_SLIDE: Create formatted tables
-        // - TWO_COLUMN_SLIDE: Create side-by-side content
-        // - etc.
+    createTitleSlide(slide, slideData) {
+        // Main title
+        slide.addText(slideData.title, {
+            x: 1, y: 1.5, w: 8, h: 1.5,
+            fontSize: 36,
+            color: '2E3D49',
+            bold: true,
+            align: 'center'
+        });
 
-        throw new Error('Slide creation with PptxGenJS not yet implemented');
+        // Subtitle if provided
+        if (slideData.subtitle) {
+            slide.addText(slideData.subtitle, {
+                x: 1, y: 3, w: 8, h: 1,
+                fontSize: 20,
+                color: '666666',
+                align: 'center'
+            });
+        }
+
+        // Date and author
+        const currentDate = new Date().toLocaleDateString();
+        slide.addText(`${currentDate}`, {
+            x: 1, y: 4.5, w: 8, h: 0.5,
+            fontSize: 14,
+            color: '888888',
+            align: 'center'
+        });
     }
 
     /**
-     * Future method: Create PptxGenJS documentation understanding agent
-     * TODO: Implement in separate session
+     * Create agenda slide layout
      */
-    async createPptxGenJSAgent() {
-        // This agent will understand PptxGenJS documentation and generate
-        // proper PptxGenJS code for creating slides with:
-        // - Proper positioning
-        // - Correct formatting
-        // - Table structures
-        // - Text alignment
-        // - Color schemes
-        // - Font settings
+    createAgendaSlide(slide, slideData) {
+        // Title
+        slide.addText(slideData.title, {
+            x: 1, y: 0.5, w: 8, h: 0.8,
+            fontSize: 28,
+            color: '2E3D49',
+            bold: true
+        });
 
-        throw new Error('PptxGenJS documentation agent not yet implemented');
+        // Agenda items as bullet points
+        if (slideData.content && slideData.content.length > 0) {
+            const bulletText = slideData.content.map(item => `• ${item}`).join('\n');
+            slide.addText(bulletText, {
+                x: 1.5, y: 1.5, w: 7, h: 3.5,
+                fontSize: 18,
+                color: '333333',
+                valign: 'top'
+            });
+        }
+    }
+
+    /**
+     * Create content slide with bullet points
+     */
+    createContentSlide(slide, slideData) {
+        // Title
+        slide.addText(slideData.title, {
+            x: 1, y: 0.5, w: 8, h: 0.8,
+            fontSize: 24,
+            color: '2E3D49',
+            bold: true
+        });
+
+        // Content as bullet points
+        if (slideData.content && slideData.content.length > 0) {
+            const bulletText = slideData.content.map(item => `• ${item}`).join('\n\n');
+            slide.addText(bulletText, {
+                x: 1.5, y: 1.5, w: 7, h: 3.5,
+                fontSize: 16,
+                color: '333333',
+                valign: 'top',
+                lineSpacing: 1.2
+            });
+        }
+    }
+
+    /**
+     * Create table slide layout
+     */
+    createTableSlide(slide, slideData) {
+        // Title
+        slide.addText(slideData.title, {
+            x: 1, y: 0.5, w: 8, h: 0.8,
+            fontSize: 24,
+            color: '2E3D49',
+            bold: true
+        });
+
+        // Table content
+        if (slideData.table_data && slideData.table_data.length > 0) {
+            const tableRows = slideData.table_data.map(row => {
+                return Array.isArray(row) ? row : [row];
+            });
+
+            slide.addTable(tableRows, {
+                x: 1, y: 1.5, w: 8, h: 3,
+                fontSize: 14,
+                color: '333333',
+                border: { type: 'solid', color: 'CCCCCC', pt: 1 },
+                fill: { color: 'F8F9FA' },
+                align: 'left',
+                valign: 'middle'
+            });
+        }
+    }
+
+    /**
+     * Create two-column slide layout
+     */
+    createTwoColumnSlide(slide, slideData) {
+        // Title
+        slide.addText(slideData.title, {
+            x: 1, y: 0.5, w: 8, h: 0.8,
+            fontSize: 24,
+            color: '2E3D49',
+            bold: true
+        });
+
+        // Left column
+        if (slideData.left_content) {
+            const leftText = Array.isArray(slideData.left_content) 
+                ? slideData.left_content.map(item => `• ${item}`).join('\n\n')
+                : slideData.left_content;
+                
+            slide.addText(leftText, {
+                x: 1, y: 1.5, w: 3.8, h: 3.5,
+                fontSize: 14,
+                color: '333333',
+                valign: 'top',
+                lineSpacing: 1.2
+            });
+        }
+
+        // Right column
+        if (slideData.right_content) {
+            const rightText = Array.isArray(slideData.right_content)
+                ? slideData.right_content.map(item => `• ${item}`).join('\n\n')
+                : slideData.right_content;
+                
+            slide.addText(rightText, {
+                x: 5.2, y: 1.5, w: 3.8, h: 3.5,
+                fontSize: 14,
+                color: '333333',
+                valign: 'top',
+                lineSpacing: 1.2
+            });
+        }
+    }
+
+    /**
+     * Create text box slide layout for flexible positioning
+     */
+    createTextBoxSlide(slide, slideData) {
+        // Title
+        slide.addText(slideData.title, {
+            x: 1, y: 0.5, w: 8, h: 0.8,
+            fontSize: 24,
+            color: '2E3D49',
+            bold: true
+        });
+
+        // Text boxes with flexible positioning
+        if (slideData.text_boxes && slideData.text_boxes.length > 0) {
+            slideData.text_boxes.forEach((textBox, index) => {
+                slide.addText(textBox.content, {
+                    x: textBox.x || 1 + (index % 2) * 4,
+                    y: textBox.y || 1.5 + Math.floor(index / 2) * 1.5,
+                    w: textBox.w || 3.5,
+                    h: textBox.h || 1,
+                    fontSize: textBox.fontSize || 14,
+                    color: textBox.color || '333333',
+                    align: textBox.align || 'left',
+                    valign: textBox.valign || 'top'
+                });
+            });
+        }
+    }
+
+    /**
+     * Create summary slide layout
+     */
+    createSummarySlide(slide, slideData) {
+        // Title
+        slide.addText(slideData.title, {
+            x: 1, y: 0.5, w: 8, h: 0.8,
+            fontSize: 28,
+            color: '2E3D49',
+            bold: true
+        });
+
+        // Key takeaways
+        if (slideData.key_takeaways && slideData.key_takeaways.length > 0) {
+            const takeawaysText = slideData.key_takeaways.map((item, index) => `${index + 1}. ${item}`).join('\n\n');
+            slide.addText(takeawaysText, {
+                x: 1.5, y: 1.5, w: 7, h: 3.5,
+                fontSize: 16,
+                color: '333333',
+                valign: 'top',
+                lineSpacing: 1.3
+            });
+        }
+    }
+
+    /**
+     * Create thank you slide layout
+     */
+    createThankYouSlide(slide, slideData) {
+        // Thank you message
+        slide.addText('Thank You', {
+            x: 1, y: 2, w: 8, h: 1.5,
+            fontSize: 48,
+            color: '2E3D49',
+            bold: true,
+            align: 'center'
+        });
+
+        // Contact info or additional message
+        if (slideData.message) {
+            slide.addText(slideData.message, {
+                x: 1, y: 3.5, w: 8, h: 1,
+                fontSize: 18,
+                color: '666666',
+                align: 'center'
+            });
+        }
+    }
+
+    /**
+     * Save a local copy of the PowerPoint file for testing
+     */
+    async saveLocalCopy(pres, filename) {
+        try {
+            // Only save locally in development mode
+            if (process.env.NODE_ENV === 'production' || process.env.WEBSITE_SITE_NAME) {
+                return; // Skip in Azure production
+            }
+
+            // Create local_output directory if it doesn't exist
+            const outputDir = path.join(__dirname, '../../local_output');
+            if (!fs.existsSync(outputDir)) {
+                fs.mkdirSync(outputDir, { recursive: true });
+                console.log('[PptxGenerator] Created local_output directory');
+            }
+
+            // Save the PowerPoint file locally
+            const localPath = path.join(outputDir, filename);
+            await pres.writeFile({ fileName: localPath });
+            
+            console.log(`[PptxGenerator] PowerPoint saved locally: ${localPath}`);
+
+        } catch (error) {
+            console.warn('[PptxGenerator] Failed to save local copy:', error.message);
+            // Don't throw error - local save is optional
+        }
     }
 }
 
