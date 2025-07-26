@@ -46,3 +46,4 @@ wheels/
 .DS_Store
 Thumbs.db
 /azure_function_ppt_v2/node_modules
+/azure_function_ppt_v2/local_output
