@@ -7,7 +7,12 @@
       "Bash(rm:*)",
       "Bash(mkdir:*)",
       "WebFetch(domain:python-pptx.readthedocs.io)",
-      "Bash(del test_outline_structure.py)"
+      "Bash(del test_outline_structure.py)",
+      "Bash(npm start)",
+      "Bash(taskkill:*)",
+      "Bash(cmd /c:*)",
+      "Bash(mv:*)",
+      "Bash(npm test)"
     ],
     "deny": []
   }

@@ -1,4 +1,4 @@
-const { BaseAgent } = require('./baseAgent');
+const { BaseAgent } = require('./core/baseAgent');
 
 /**
  * DocumentProcessor Agent

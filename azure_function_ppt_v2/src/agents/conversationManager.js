@@ -1,4 +1,4 @@
-const { BaseAgent } = require('./baseAgent');
+const { BaseAgent } = require('./core/baseAgent');
 
 /**
  * ConversationManager Agent
@@ -38,12 +38,19 @@ class ConversationManager extends BaseAgent {
         const aiResponse = await this.callAI(messages);
         const result = this.parseAIResponse(aiResponse.content);
 
-        // Add document content to result if present
+        // Add document content to result if present in current message
         if (documentInfo.has_document) {
             result.document_content = documentInfo.document_content;
             result.has_document_content = true;
         } else {
-            result.has_document_content = false;
+            // Check if document content exists in conversation history
+            const documentFromHistory = this.extractDocumentFromHistory(conversation_history);
+            if (documentFromHistory) {
+                result.document_content = documentFromHistory;
+                result.has_document_content = true;
+            } else {
+                result.has_document_content = false;
+            }
         }
 
         return result;
@@ -129,6 +136,30 @@ Analyze the user's message in context and determine their intent. Decide whether
 Provide a helpful response and indicate whether presentation generation should proceed.`;
 
         return prompt;
+    }
+
+    /**
+     * Extract document content from conversation history
+     * @param {Array} conversationHistory - Array of conversation messages
+     * @returns {string|null} Document content if found, null otherwise
+     */
+    extractDocumentFromHistory(conversationHistory) {
+        if (!conversationHistory || conversationHistory.length === 0) {
+            return null;
+        }
+
+        // Look through conversation history for document content
+        for (const message of conversationHistory) {
+            if (message.role === 'user' && message.content) {
+                const documentInfo = this.extractDocumentContent(message.content);
+                if (documentInfo.has_document) {
+                    console.log('[ConversationManager] Found document content in conversation history');
+                    return documentInfo.document_content;
+                }
+            }
+        }
+
+        return null;
     }
 }
 

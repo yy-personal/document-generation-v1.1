@@ -1,5 +1,5 @@
 const { OpenAI } = require('openai');
-const { getOpenAIConfig, getAgentConfig } = require('../config/config');
+const { getOpenAIConfig, getAgentConfig } = require('../../config/config');
 
 /**
  * Base Agent class for all PowerPoint generation agents

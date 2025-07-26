@@ -4,16 +4,44 @@ Next-generation conversational PowerPoint generation using PptxGenJS for enhance
 
 ## Overview
 
-This Node.js Azure Function provides a conversational interface for creating PowerPoint presentations from documents. Unlike the previous Python-based service, this version uses PptxGenJS for superior PowerPoint generation and supports multi-turn conversations for iterative refinement.
+This Node.js Azure Function provides a conversational interface for creating PowerPoint presentations from documents. Features a complete agent-based pipeline with placeholder PowerPoint generation ready for PptxGenJS integration.
 
-### Key Features
+### Current Implementation Status
 
-✅ **Conversational Interface** - Multi-turn conversations for presentation refinement  
-✅ **Document Processing** - Supports PDF and Word documents via `[document]` tags  
-✅ **Smart Slide Estimation** - AI-powered slide count estimation based on content complexity  
-✅ **Intelligent Content Structuring** - Organized slide-by-slide content planning  
-⏳ **PptxGenJS Integration** - Enhanced PowerPoint generation (to be implemented)  
-⏳ **Company Template Support** - Custom template integration (future feature)  
+**Conversational Interface** - COMPLETE - Multi-turn conversations with session management  
+**Document Processing** - COMPLETE - Supports PDF and Word documents via `[document]` tags  
+**Smart Slide Estimation** - COMPLETE - AI-powered slide count estimation (5-30 slides)  
+**Intelligent Content Structuring** - COMPLETE - Organized slide-by-slide content planning  
+**PowerPoint Generation** - PLACEHOLDER - Returns mock PowerPoint data, ready for PptxGenJS integration
+
+## Quick Start
+
+### Prerequisites
+- Node.js 18+
+- Azure Functions Core Tools
+- Azure OpenAI access
+
+### Installation & Setup
+```bash
+cd azure_function_ppt_v2
+npm install
+
+# Start service (kills any existing process on port first)
+npm run restart
+
+# Or manually
+npm start    # Runs on port 7076
+```
+
+### Environment
+Service uses the **root .env file** (same as Python services):
+- File: `document-generation-v1.1/.env`
+- No additional configuration needed
+
+### Testing
+```bash
+npm test    # Run conversation flow tests
+```
 
 ## Architecture
 
@@ -25,76 +53,10 @@ ConversationManager → DocumentProcessor → SlideEstimator → ContentStructur
 ```
 
 ### Conversational Flow
-1. **Document Upload** - User uploads document and asks questions
-2. **Context Building** - User provides additional requirements/clarifications  
-3. **Slide Estimation** - System estimates slide count and presents plan
-4. **Generation Request** - User confirms and requests presentation creation
-5. **PowerPoint Delivery** - System generates and returns base64 PowerPoint file
-
-## Quick Start
-
-### Prerequisites
-- Node.js 18+ 
-- Azure Functions Core Tools
-- Azure OpenAI access
-
-### Installation
-```bash
-cd azure_function_ppt_v2
-npm install
-```
-
-### Environment Setup
-Configure environment variables in `local.settings.json`:
-```json
-{
-  "Values": {
-    "ENDPOINT_URL": "https://your-ai-foundry-endpoint.openai.azure.com/",
-    "DEPLOYMENT_NAME": "gpt-4.1-ncsgpt-dev",
-    "AZURE_OPENAI_API_KEY": "your-api-key",
-    "API_VERSION": "2025-01-01-preview"
-  }
-}
-```
-
-### Run Locally
-```bash
-npm start
-# Service runs on http://localhost:7071
-```
-
-### Test the Service
-```bash
-npm test
-```
-
-## Agent Architecture
-
-### ConversationManager
-- **Purpose**: Manages conversation flow and user intent analysis
-- **Input**: User messages, conversation history, session context
-- **Output**: Intent classification, generation decisions, contextual responses
-
-### DocumentProcessor  
-- **Purpose**: Extracts and organizes document content for presentation structure
-- **Input**: Raw document content, user context
-- **Output**: Structured topics, content classification, complexity analysis
-
-### SlideEstimator
-- **Purpose**: Analyzes content complexity and estimates optimal slide count
-- **Input**: Document content or processed structure
-- **Output**: Slide count estimate, complexity assessment, breakdown rationale
-
-### ContentStructurer
-- **Purpose**: Creates detailed slide-by-slide structure with layouts and content
-- **Input**: Processed content, slide estimates, user requirements
-- **Output**: Complete slide structure with layouts, content, and formatting guidance
-
-### PptxGenerator
-- **Purpose**: Generates PowerPoint files using PptxGenJS
-- **Status**: ⏳ **Placeholder** - PptxGenJS integration pending
-- **Input**: Structured slide content, session info
-- **Output**: Base64 PowerPoint file
+1. **Document Upload** - User uploads document with optional questions
+2. **Context Building** - User adds requirements/clarifications
+3. **Generation Request** - User requests presentation creation
+4. **PowerPoint Delivery** - System generates base64 PowerPoint file
 
 ## API Usage
 
@@ -103,158 +65,143 @@ npm test
 POST /api/powerpointGeneration
 ```
 
-### Request Format
+### Conversation Example
 ```json
+// 1. Upload document
 {
-  "user_message": "Create a presentation [document]<base64_content>",
-  "entra_id": "user-123",
-  "session_id": "optional-session-id",
-  "conversation_history": []
+  "user_message": "What presentation would work best? [document]<content>",
+  "entra_id": "user-123"
+}
+
+// 2. Add context (optional)
+{
+  "user_message": "Focus on implementation timeline",
+  "session_id": "PPTV2...",
+  "conversation_history": [...]
+}
+
+// 3. Generate presentation
+{
+  "user_message": "Create the presentation now",
+  "session_id": "PPTV2...",
+  "conversation_history": [...]
 }
 ```
 
-### Response Format
-```json
-{
-  "response_data": {
-    "status": "completed",
-    "session_id": "PPTV220240726ABC123",
-    "conversation_history": [...],
-    "pipeline_info": ["ConversationManager", "DocumentProcessor", ...],
-    "processing_info": {
-      "conversation": {...},
-      "slide_estimate": {...},
-      "content_structure": {...}
-    },
-    "response_text": "Generated presentation with 12 slides...",
-    "powerpoint_output": {
-      "ppt_data": "base64_encoded_powerpoint",
-      "filename": "presentation_PPTV220240726ABC123.pptx",
-      "file_size_kb": 145,
-      "slide_count": 12
-    }
-  }
-}
-```
+## Agent Architecture
+
+### Core Agents
+- **ConversationManager** - Intent analysis, conversation flow
+- **DocumentProcessor** - Content extraction and organization  
+- **SlideEstimator** - Smart slide count estimation (5-30 slides)
+- **ContentStructurer** - Detailed slide layouts and content
+- **PptxGenerator** - PowerPoint file generation (placeholder)
+
+### Base Agent
+All agents inherit from `core/baseAgent.js` which provides:
+- OpenAI API integration
+- Error handling
+- JSON parsing
+- Common utilities
 
 ## Configuration
 
-### Slide Limits
+### Centralized Settings
+**File:** `src/config/config.js`
+
 ```javascript
+// Service configuration
+LOCAL_DEV_CONFIG = {
+    port: 7076,  // Update both config.js and package.json if changing
+    host: 'localhost',
+    api_path: '/api/powerpointGeneration'
+}
+
+// Slide configuration
 PRESENTATION_CONFIG = {
-    max_slides: 30,        // Maximum allowed slides
-    min_slides: 5,         // Minimum slides required  
-    default_slides: 12     // Default target for medium complexity
+    max_slides: 30,
+    min_slides: 5,
+    default_slides: 12
 }
 ```
 
-### Agent Settings
-Each agent has configurable token limits and temperature settings:
-- **ConversationManager**: 3,000 tokens, temp 0.3 (focused conversation)
-- **DocumentProcessor**: 8,000 tokens, temp 0.4 (balanced analysis)
-- **SlideEstimator**: 4,000 tokens, temp 0.3 (precise estimation)
-- **ContentStructurer**: 12,000 tokens, temp 0.5 (creative structuring)
-- **PptxGenerator**: 6,000 tokens, temp 0.2 (consistent generation)
+### Port Management
+If port 7076 is in use:
+- **Recommended**: `npm run restart` (auto-kills existing processes)
+- **Manual**: Use `netstat -ano | findstr :7076` then `taskkill /PID <PID> /F`
+- **Change port**: Update both `config.js` (line 157) and `package.json` (line 6)
 
 ## Current Status
 
-### ✅ Completed
-- [x] Node.js Azure Function structure
-- [x] Agent architecture and pipeline
-- [x] Conversation management system
-- [x] Document processing and analysis
-- [x] Slide count estimation
-- [x] Content structuring with layouts
-- [x] Session and conversation history management
-- [x] Test script and API validation
+### Completed (Ready for Production Testing)
+- [x] **Full Agent Pipeline** - ConversationManager → DocumentProcessor → SlideEstimator → ContentStructurer → PptxGenerator
+- [x] **Conversational Flow** - Multi-turn conversations with intent analysis and session management
+- [x] **Document Processing** - Supports PDF/Word via [document] tags with content extraction
+- [x] **Smart Slide Estimation** - AI-powered slide count analysis (5-30 slides) based on content complexity
+- [x] **Content Structuring** - Detailed slide-by-slide layouts with multiple content types
+- [x] **Session Management** - Conversation history tracking with unique session IDs
+- [x] **Centralized Configuration** - Single config file with OpenAI, agent, and service settings
+- [x] **Testing Infrastructure** - Comprehensive test script for conversation flow validation
+- [x] **Port Management** - Auto-restart functionality with process cleanup
+- [x] **Code Quality** - Emoji-free codebase with consistent formatting
 
-### ⏳ In Progress
-- [ ] **PptxGenJS Integration** (next session priority)
-  - PptxGenJS documentation understanding agent
-  - Slide creation with proper formatting
-  - Table and multi-column layout support
-  - Positioning and styling optimization
+### Functional Capabilities (Current)
+- Upload documents and ask questions about presentation needs
+- Maintain conversation context across multiple interactions
+- Estimate optimal slide counts based on document content and user requirements
+- Structure content into professional slide layouts (title, agenda, content, two-column, table, summary, thank you)
+- Generate session-based responses with conversation history
+- Return placeholder PowerPoint data with proper metadata (filename, size, slide count)
 
-### 🔮 Future Features
-- [ ] Company template integration
-- [ ] Advanced visual design options
-- [ ] Image and chart placeholders
-- [ ] Multi-language support
-- [ ] Batch presentation generation
-
-## Next Steps
-
-### Immediate Priority: PptxGenJS Integration
-The service is currently using a placeholder for PowerPoint generation. The next development session should focus on:
-
-1. **PptxGenJS Documentation Agent** - Create an agent that understands PptxGenJS API
-2. **Slide Creation Logic** - Implement proper slide generation with formatting
-3. **Layout Implementation** - Support for different slide layouts (title, content, table, two-column)
-4. **Styling and Positioning** - Proper text formatting, colors, and element positioning
-5. **Testing and Validation** - Ensure generated PowerPoint files are properly formatted
-
-### Development Approach for PptxGenJS
-1. Study PptxGenJS documentation and examples
-2. Create agent that can generate PptxGenJS code
-3. Implement slide-by-slide generation logic
-4. Add support for tables, bullet points, and multi-column layouts  
-5. Test with various content types and complexity levels
-
-## Testing
-
-### Test Scenarios
-The test script validates:
-- Service availability and health check
-- Conversational flow (question → context → generation)
-- Agent pipeline execution
-- Session and conversation history management
-- Response format validation
-
-### Running Tests
-```bash
-# Start the service first
-npm start
-
-# In another terminal, run tests
-npm test
-```
-
-## Dependencies
-
-### Core Dependencies
-- `@azure/functions`: Azure Functions runtime
-- `pptxgenjs`: PowerPoint generation library  
-- `openai`: OpenAI API client
-- `dotenv`: Environment variable management
-
-### Development
-- `@azure/functions-core-tools`: Local development tools
+### Ready for Next Development Session
+- [ ] **PptxGenJS Integration** - Replace placeholder with actual PowerPoint generation
+- [ ] **Slide Creation** - Implement PptxGenJS slide formatting for all layout types
+- [ ] **Table Support** - Add formatted table generation within slides
+- [ ] **Multi-column Layouts** - Enhanced two-column and complex layout support
+- [ ] **Company Templates** - Integration with branded PowerPoint templates
 
 ## Project Structure
 ```
 azure_function_ppt_v2/
+├── powerpointGeneration/
+│   ├── function.json              # Function binding
+│   └── index.js                   # HTTP trigger
 ├── src/
-│   ├── functions/
-│   │   └── powerpointGeneration.js    # Main HTTP trigger
 │   ├── agents/
-│   │   ├── baseAgent.js               # Base agent class
-│   │   ├── conversationManager.js     # Conversation flow management
-│   │   ├── documentProcessor.js       # Document content extraction  
-│   │   ├── slideEstimator.js          # Slide count estimation
-│   │   ├── contentStructurer.js       # Slide structure creation
-│   │   └── pptxGenerator.js           # PowerPoint generation (placeholder)
+│   │   ├── core/
+│   │   │   └── baseAgent.js       # Base agent class
+│   │   ├── conversationManager.js
+│   │   ├── documentProcessor.js
+│   │   ├── slideEstimator.js
+│   │   ├── contentStructurer.js
+│   │   └── pptxGenerator.js
 │   ├── orchestrator/
-│   │   └── pptOrchestrator.js         # Main pipeline orchestration
+│   │   └── pptOrchestrator.js     # Pipeline management
 │   └── config/
-│       └── config.js                  # Service configuration
+│       └── config.js              # Centralized configuration
 ├── test/
-│   └── test-poc.js                    # Test script
-├── package.json                       # Node.js dependencies
-├── host.json                          # Azure Functions configuration
-├── local.settings.json                # Local environment variables
-└── README.md                          # This file
+│   └── test-poc.js               # Conversation tests
+├── package.json
+├── host.json
+└── local.settings.json
 ```
+
+## Development Notes
+
+### For Next Session - PptxGenJS Integration
+The service is fully functional with all agent pipeline components complete. The only remaining work is replacing the placeholder PowerPoint generation in `src/agents/pptxGenerator.js` with actual PptxGenJS implementation.
+
+**Key Integration Points:**
+- `generateWithPptxGenJS()` method needs implementation
+- Slide creation methods for different layouts (title, content, table, two-column)
+- PptxGenJS configuration for fonts, colors, and positioning
+- Base64 file generation and proper error handling
+
+**Current Placeholder Behavior:**
+- Returns mock base64 PowerPoint data
+- Simulates 2-second generation time
+- Provides proper response structure for frontend integration
 
 ---
 
-**PowerPoint Generation Service v2** - Conversational presentation creation with enhanced capabilities using PptxGenJS.
+**PowerPoint Generation Service v2** - Complete conversational pipeline ready for PptxGenJS integration

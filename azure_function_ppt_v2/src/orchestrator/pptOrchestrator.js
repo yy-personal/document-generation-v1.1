@@ -202,7 +202,7 @@ class PowerPointOrchestrator {
     }
 
     formatGenerationResponse(slideEstimate, pptxResult) {
-        return `✅ PowerPoint presentation generated successfully!\n\n📊 Presentation Details:\n- Slides: ${slideEstimate.estimated_slides}\n- File: ${pptxResult.filename}\n- Size: ${Math.round(pptxResult.file_size_kb)}KB\n\nYour presentation is ready for download.`;
+        return `PowerPoint presentation generated successfully!\n\nPresentation Details:\n- Slides: ${slideEstimate.estimated_slides}\n- File: ${pptxResult.filename}\n- Size: ${Math.round(pptxResult.file_size_kb)}KB\n\nYour presentation is ready for download.`;
     }
 }
 

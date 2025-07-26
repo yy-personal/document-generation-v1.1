@@ -6,9 +6,10 @@
  */
 
 const http = require('http');
+const { getApiUrl, getLocalUrl } = require('../src/config/config');
 
 class PowerPointV2Test {
-    constructor(apiUrl = 'http://localhost:7071/api/powerpointGeneration') {
+    constructor(apiUrl = getApiUrl()) {
         this.apiUrl = apiUrl;
         this.testDocument = `Digital Marketing Strategy 2024
 
@@ -63,9 +64,9 @@ We will measure success through:
 
     async checkServiceAvailability() {
         return new Promise((resolve) => {
-            const req = http.get('http://localhost:7071', (res) => {
-                resolve(true);
-            });
+            const req = http.get(getLocalUrl(), (res) => {
+				resolve(true);
+			});
             
             req.on('error', () => {
                 resolve(false);
@@ -82,17 +83,18 @@ We will measure success through:
         return new Promise((resolve, reject) => {
             const postData = JSON.stringify(requestData);
             
+            const { LOCAL_DEV_CONFIG } = require('../src/config/config');
             const options = {
-                hostname: 'localhost',
-                port: 7071,
-                path: '/api/powerpointGeneration',
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Content-Length': Buffer.byteLength(postData)
-                },
-                timeout: 60000
-            };
+				hostname: LOCAL_DEV_CONFIG.host,
+				port: LOCAL_DEV_CONFIG.port,
+				path: LOCAL_DEV_CONFIG.api_path,
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Content-Length": Buffer.byteLength(postData),
+				},
+				timeout: 60000,
+			};
 
             const startTime = Date.now();
             const req = http.request(options, (res) => {
@@ -129,7 +131,7 @@ We will measure success through:
     }
 
     async testConversationalFlow() {
-        console.log('🗣️  Testing Conversational Flow...\n');
+        console.log('Testing Conversational Flow...\n');
 
         try {
             // Test 1: Document upload with question
@@ -140,11 +142,11 @@ We will measure success through:
             };
 
             const test1Response = await this.makeRequest(test1Request, 'Document Question');
-            console.log(`✅ Status: ${test1Response.statusCode}`);
-            console.log(`⏱️  Time: ${test1Response.processingTime.toFixed(1)}s`);
-            console.log(`🔄 Pipeline: ${test1Response.response_data?.pipeline_info?.join(' → ') || 'N/A'}`);
-            console.log(`💬 Response: ${test1Response.response_data?.response_text?.substring(0, 100)}...`);
-            console.log(`📊 Should Generate: ${test1Response.response_data?.processing_info?.conversation?.should_generate_presentation}`);
+            console.log(`Status: ${test1Response.statusCode}`);
+            console.log(`Time: ${test1Response.processingTime.toFixed(1)}s`);
+            console.log(`Pipeline: ${test1Response.response_data?.pipeline_info?.join(' → ') || 'N/A'}`);
+            console.log(`Response: ${test1Response.response_data?.response_text?.substring(0, 100)}...`);
+            console.log(`Should Generate: ${test1Response.response_data?.processing_info?.conversation?.should_generate_presentation}`);
 
             // Get session context for next test
             const sessionId = test1Response.response_data?.session_id;
@@ -160,10 +162,10 @@ We will measure success through:
             };
 
             const test2Response = await this.makeRequest(test2Request, 'Follow-up Context');
-            console.log(`✅ Status: ${test2Response.statusCode}`);
-            console.log(`⏱️  Time: ${test2Response.processingTime.toFixed(1)}s`);
-            console.log(`💬 Response: ${test2Response.response_data?.response_text?.substring(0, 100)}...`);
-            console.log(`📊 Estimated Slides: ${test2Response.response_data?.processing_info?.slide_estimate?.estimated_slides || 'N/A'}`);
+            console.log(`Status: ${test2Response.statusCode}`);
+            console.log(`Time: ${test2Response.processingTime.toFixed(1)}s`);
+            console.log(`Response: ${test2Response.response_data?.response_text?.substring(0, 100)}...`);
+            console.log(`Estimated Slides: ${test2Response.response_data?.processing_info?.slide_estimate?.estimated_slides || 'N/A'}`);
 
             // Test 3: Generation request
             console.log('\nTest 3: Presentation generation request');
@@ -175,38 +177,38 @@ We will measure success through:
             };
 
             const test3Response = await this.makeRequest(test3Request, 'Generate Presentation');
-            console.log(`✅ Status: ${test3Response.statusCode}`);
-            console.log(`⏱️  Time: ${test3Response.processingTime.toFixed(1)}s`);
-            console.log(`🔄 Pipeline: ${test3Response.response_data?.pipeline_info?.join(' → ') || 'N/A'}`);
+            console.log(`Status: ${test3Response.statusCode}`);
+            console.log(`Time: ${test3Response.processingTime.toFixed(1)}s`);
+            console.log(`Pipeline: ${test3Response.response_data?.pipeline_info?.join(' → ') || 'N/A'}`);
             
             if (test3Response.response_data?.powerpoint_output) {
                 const pptOutput = test3Response.response_data.powerpoint_output;
-                console.log(`📄 PowerPoint Generated: YES`);
-                console.log(`📁 Filename: ${pptOutput.filename}`);
-                console.log(`📏 File Size: ${pptOutput.file_size_kb}KB`);
-                console.log(`📊 Slide Count: ${pptOutput.slide_count}`);
+                console.log(`PowerPoint Generated: YES`);
+                console.log(`Filename: ${pptOutput.filename}`);
+                console.log(`File Size: ${pptOutput.file_size_kb}KB`);
+                console.log(`Slide Count: ${pptOutput.slide_count}`);
             } else {
-                console.log(`📄 PowerPoint Generated: NO`);
+                console.log(`PowerPoint Generated: NO`);
             }
 
             return true;
 
         } catch (error) {
-            console.error(`❌ Conversational flow test failed: ${error.message}`);
+            console.error(`Conversational flow test failed: ${error.message}`);
             return false;
         }
     }
 
     async testServiceStatus() {
-        console.log('🔍 Testing Service Status...\n');
+        console.log('Testing Service Status...\n');
 
         try {
             const response = await this.makeRequest({}, 'Service Status');
-            console.log(`✅ Status: ${response.statusCode}`);
-            console.log(`📋 Service Info:`, response);
+            console.log(`Status: ${response.statusCode}`);
+            console.log(`Service Info:`, response);
             return response.statusCode === 200;
         } catch (error) {
-            console.error(`❌ Service status test failed: ${error.message}`);
+            console.error(`Service status test failed: ${error.message}`);
             return false;
         }
     }
@@ -217,11 +219,12 @@ We will measure success through:
         console.log('=' .repeat(60));
 
         // Check service availability
-        console.log('🔍 Checking service availability...');
+        console.log('Checking service availability...');
         const isAvailable = await this.checkServiceAvailability();
         
         if (!isAvailable) {
-            console.log('❌ Service not available at localhost:7071');
+            const { LOCAL_DEV_CONFIG } = require('../src/config/config');
+            console.log(`Service not available at ${LOCAL_DEV_CONFIG.host}:${LOCAL_DEV_CONFIG.port}`);
             console.log('Start the service with:');
             console.log('  cd azure_function_ppt_v2');
             console.log('  npm install');
@@ -229,7 +232,7 @@ We will measure success through:
             return false;
         }
 
-        console.log('✅ Service is available\n');
+        console.log('Service is available\n');
 
         // Run tests
         const tests = [
@@ -241,14 +244,14 @@ We will measure success through:
         
         for (const test of tests) {
             console.log(`\n${'='.repeat(40)}`);
-            console.log(`🧪 ${test.name.toUpperCase()}`);
+            console.log(`TEST: ${test.name.toUpperCase()}`);
             console.log(`${'='.repeat(40)}`);
             
             try {
                 const success = await test.fn();
                 results.push({ name: test.name, success });
             } catch (error) {
-                console.error(`❌ ${test.name} failed:`, error.message);
+                console.error(`${test.name} failed:`, error.message);
                 results.push({ name: test.name, success: false });
             }
         }
@@ -262,17 +265,17 @@ We will measure success through:
         const total = results.length;
 
         results.forEach(result => {
-            const status = result.success ? '✅ PASS' : '❌ FAIL';
+            const status = result.success ? 'PASS' : 'FAIL';
             console.log(`${result.name}: ${status}`);
         });
 
         console.log(`\nOverall: ${passed}/${total} tests passed`);
 
         if (passed === total) {
-            console.log('\n🎉 ALL TESTS PASSED!');
+            console.log('\nALL TESTS PASSED!');
             console.log('The PowerPoint Generation v2 service is working correctly.');
         } else {
-            console.log(`\n⚠️  ${total - passed} TEST(S) FAILED`);
+            console.log(`\n${total - passed} TEST(S) FAILED`);
             console.log('Check the service logs for detailed error information.');
         }
 

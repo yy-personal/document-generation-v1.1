@@ -2,9 +2,9 @@
   "name": "powerpoint-generation-v2",
   "version": "1.0.0",
   "description": "PowerPoint Generation Service v2 using PptxGenJS",
-  "main": "src/index.js",
   "scripts": {
-    "start": "npx func start",
+    "start": "npx func start --port 7076",
+    "restart": "start.bat",
     "test": "node test/test-poc.js",
     "func": "npx func"
   },

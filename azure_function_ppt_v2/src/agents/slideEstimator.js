@@ -1,4 +1,4 @@
-const { BaseAgent } = require('./baseAgent');
+const { BaseAgent } = require('./core/baseAgent');
 const { PRESENTATION_CONFIG } = require('../config/config');
 
 /**

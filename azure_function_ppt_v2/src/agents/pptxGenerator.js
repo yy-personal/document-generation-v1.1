@@ -1,4 +1,4 @@
-const { BaseAgent } = require('./baseAgent');
+const { BaseAgent } = require('./core/baseAgent');
 const { PPTX_CONFIG } = require('../config/config');
 const PptxGenJS = require('pptxgenjs');
 

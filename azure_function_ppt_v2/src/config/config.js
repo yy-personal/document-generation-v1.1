@@ -1,4 +1,6 @@
-require('dotenv').config();
+// Load environment variables from parent directory .env file (same as Python services)
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../../../.env') });
 
 /**
  * Configuration module for PowerPoint Generation Service v2
@@ -12,17 +14,24 @@ require('dotenv').config();
 const loadEnvironment = () => {
     // Check if running in Azure
     if (process.env.WEBSITE_SITE_NAME) {
+        console.log('Running in Azure - using Function App environment variables');
         return; // Running in Azure, use environment variables directly
     }
     
-    // For local development, environment variables are loaded from .env or local.settings.json
+    // For local development, load from parent directory .env file (same as Python services)
+    console.log('Running locally - loading from root .env file');
+    
     const requiredEnvVars = ['ENDPOINT_URL', 'DEPLOYMENT_NAME', 'AZURE_OPENAI_API_KEY', 'API_VERSION'];
     
     for (const envVar of requiredEnvVars) {
         if (!process.env[envVar]) {
+            console.error(`Missing required environment variable: ${envVar}`);
+            console.error('Make sure the root .env file (document-generation-v1.1/.env) has all required values');
             throw new Error(`Missing required environment variable: ${envVar}`);
         }
     }
+    
+    console.log('Environment variables loaded successfully from root .env file');
 };
 
 // ====================================================================
@@ -141,6 +150,19 @@ const SESSION_CONFIG = {
 };
 
 // ====================================================================
+// LOCAL DEVELOPMENT CONFIGURATION
+// ====================================================================
+
+const LOCAL_DEV_CONFIG = {
+    port: 7076,
+    host: 'localhost',
+    api_path: '/api/powerpointGeneration'
+};
+
+const getLocalUrl = () => `http://${LOCAL_DEV_CONFIG.host}:${LOCAL_DEV_CONFIG.port}`;
+const getApiUrl = () => `${getLocalUrl()}${LOCAL_DEV_CONFIG.api_path}`;
+
+// ====================================================================
 // PPTXGENJS CONFIGURATION
 // ====================================================================
 
@@ -203,8 +225,11 @@ module.exports = {
     QUICK_RESPONSE_PIPELINE,
     AGENT_CONFIGS,
     SESSION_CONFIG,
+    LOCAL_DEV_CONFIG,
     PPTX_CONFIG,
     getAgentConfig,
     generateSessionId,
-    getOpenAIConfig
+    getOpenAIConfig,
+    getLocalUrl,
+    getApiUrl
 };
