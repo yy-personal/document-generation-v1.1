@@ -4,12 +4,12 @@ const {
     generateSessionId 
 } = require('../config/config');
 
-// Import agents (will be created next)
-const { ConversationManager } = require('../agents/conversationManager');
-const { DocumentProcessor } = require('../agents/documentProcessor');
-const { SlideEstimator } = require('../agents/slideEstimator');
-const { ContentStructurer } = require('../agents/contentStructurer');
-const { PptxGenerator } = require('../agents/pptxGenerator');
+// Import agents with updated naming convention
+const { ConversationManager } = require('../agents/conversationManager_agent');
+const { DocumentProcessor } = require('../agents/documentProcessor_skill');
+const { SlideEstimator } = require('../agents/slideEstimator_skill');
+const { ContentStructurer } = require('../agents/contentStructurer_skill');
+const { PptxGenerator } = require('../agents/pptxGenerator_skill');
 
 class PowerPointOrchestrator {
     constructor() {

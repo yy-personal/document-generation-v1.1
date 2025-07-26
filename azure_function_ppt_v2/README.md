@@ -169,12 +169,12 @@ azure_function_ppt_v2/
 ├── src/
 │   ├── agents/
 │   │   ├── core/
-│   │   │   └── baseAgent.js       # Base agent class
-│   │   ├── conversationManager.js
-│   │   ├── documentProcessor.js
-│   │   ├── slideEstimator.js
-│   │   ├── contentStructurer.js
-│   │   └── pptxGenerator.js
+│   │   │   └── baseAgent.js              # Base agent class
+│   │   ├── conversationManager_agent.js  # Conversation flow management
+│   │   ├── documentProcessor_skill.js    # Document content extraction
+│   │   ├── slideEstimator_skill.js       # Slide count estimation
+│   │   ├── contentStructurer_skill.js    # Content layout structuring
+│   │   └── pptxGenerator_skill.js        # PowerPoint generation
 │   ├── orchestrator/
 │   │   └── pptOrchestrator.js     # Pipeline management
 │   └── config/
@@ -189,7 +189,7 @@ azure_function_ppt_v2/
 ## Development Notes
 
 ### For Next Session - PptxGenJS Integration
-The service is fully functional with all agent pipeline components complete. The only remaining work is replacing the placeholder PowerPoint generation in `src/agents/pptxGenerator.js` with actual PptxGenJS implementation.
+The service is fully functional with all agent pipeline components complete. The only remaining work is replacing the placeholder PowerPoint generation in `src/agents/pptxGenerator_skill.js` with actual PptxGenJS implementation.
 
 **Key Integration Points:**
 - `generateWithPptxGenJS()` method needs implementation

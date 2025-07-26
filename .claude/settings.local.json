@@ -12,7 +12,12 @@
       "Bash(taskkill:*)",
       "Bash(cmd /c:*)",
       "Bash(mv:*)",
-      "Bash(npm test)"
+      "Bash(npm test)",
+      "Bash(ren:*)",
+      "Bash(npm run restart:*)",
+      "Bash(timeout 60s npm test)",
+      "Bash(node:*)",
+      "Bash(pkill:*)"
     ],
     "deny": []
   }
