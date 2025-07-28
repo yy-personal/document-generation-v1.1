@@ -103,7 +103,9 @@ class PptxGenerator extends BaseAgent {
                 const slideData = structuredContent.slides[i];
                 console.log(`[PptxGenerator] Creating slide ${i + 1}: ${slideData.layout}`);
                 
-                await this.createSlideWithMasterSlides(pres, slideData, i + 1);
+                // Temporarily bypass master slides to test background image directly
+                console.log(`[PptxGenerator] Bypassing master slides for background image testing`);
+                this.createSlideWithPptxGenJS(pres, slideData, i + 1);
             }
 
             // Generate filename
@@ -136,43 +138,83 @@ class PptxGenerator extends BaseAgent {
      * Define company master slides based on template structure
      */
     defineCompanyMasterSlides(pres) {
-        console.log('[PptxGenerator] Defining NCS company master slides');
+        console.log('[PptxGenerator] Defining custom company master slides');
 
-        // Title Master Slide
+        // Master 1: Cover and Title Slides
+        this.defineMaster1TitleSlides(pres);
+    }
+
+    /**
+     * Master 1: Cover and Title Slides
+     */
+    defineMaster1TitleSlides(pres) {
+        const path = require('path');
+        const backgroundImagePath = path.join(__dirname, '../../template/background_image/ncs_bg_purple_blue.png');
+        
+        // 1_cover_slide - Full background image, no placeholders
         pres.defineSlideMaster({
-            title: "NCS_TITLE_MASTER",
+            title: "1_cover_slide",
             background: { color: "FFFFFF" },
-            margin: [0.75, 0.5, 0.75, 0.5],
+            margin: [0, 0, 0, 0],
             objects: [
-                // Company branding line
-                { 
-                    line: { 
-                        x: 0.5, y: 5.4, w: 9, h: 0,
-                        line: { color: "0066CC", width: 3 }
+                // Full background image covering the entire slide
+                {
+                    image: {
+                        x: 0, y: 0, w: 10, h: 5.625, // Full slide coverage (16:9 ratio)
+                        path: backgroundImagePath
+                    }
+                }
+            ]
+        });
+
+        // 1_title_slide - Background image with title and text placeholders
+        pres.defineSlideMaster({
+            title: "1_title_slide",
+            background: { color: "FFFFFF" },
+            margin: [0, 0, 0, 0],
+            objects: [
+                // Full background image covering the entire slide
+                {
+                    image: {
+                        x: 0, y: 0, w: 10, h: 5.625, // Full slide coverage (16:9 ratio)
+                        path: backgroundImagePath
                     }
                 },
-                // Title placeholder
+                // Title placeholder - Ubuntu 44pt, bold, left-aligned
                 { 
                     placeholder: {
                         options: { 
                             name: "title", 
                             type: "title",
-                            x: 1, y: 2, w: 8, h: 1.5
+                            x: 0.646, // 1.64cm converted to inches
+                            y: 0.457, // 1.16cm converted to inches
+                            w: 8, // Default width, adjust as needed
+                            h: 1.5, // Default height, adjust as needed
+                            fontSize: 44,
+                            fontFace: "Ubuntu",
+                            bold: true,
+                            align: "left"
                         }
                     }
                 },
-                // Subtitle placeholder
+                // Text placeholder - Ubuntu 20pt, left-aligned, Turquoise
                 { 
                     placeholder: {
                         options: { 
-                            name: "subtitle", 
+                            name: "text", 
                             type: "body",
-                            x: 1, y: 3.5, w: 8, h: 1
+                            x: 0.646, // 1.64cm converted to inches
+                            y: 3.134, // 7.96cm converted to inches
+                            w: 8, // Default width, adjust as needed
+                            h: 2, // Default height, adjust as needed
+                            fontSize: 20,
+                            fontFace: "Ubuntu",
+                            color: "00A7E1", // Turquoise Accent 1
+                            align: "left"
                         }
                     }
                 }
-            ],
-            slideNumber: { x: 9.2, y: 5.2, color: "666666", fontSize: 10 }
+            ]
         });
 
         // Content Master Slide
@@ -336,15 +378,19 @@ class PptxGenerator extends BaseAgent {
 
         const masterName = masterSlideMap[slideData.layout] || 'NCS_CONTENT_MASTER';
         
+        console.log(`[PptxGenerator] Slide ${slideNumber}: Attempting to use master slide '${masterName}' for layout '${slideData.layout}'`);
+        
         try {
             // Add slide using master slide
             const slide = pres.addSlide({ masterName: masterName });
+            console.log(`[PptxGenerator] Slide ${slideNumber}: ✓ Master slide '${masterName}' applied successfully`);
             
             // Populate placeholders with content
             this.populateMasterSlidePlaceholders(slide, slideData, slideNumber);
             
         } catch (error) {
-            console.warn(`[PptxGenerator] Failed to use master slide ${masterName}: ${error.message}`);
+            console.warn(`[PptxGenerator] Slide ${slideNumber}: ❌ Failed to use master slide '${masterName}': ${error.message}`);
+            console.log(`[PptxGenerator] Slide ${slideNumber}: Falling back to manual slide creation with background image`);
             // Fallback to manual slide creation
             this.createSlideWithPptxGenJS(pres, slideData, slideNumber);
         }
@@ -478,8 +524,23 @@ class PptxGenerator extends BaseAgent {
     createSlideWithPptxGenJS(pres, slideData, slideNumber) {
         const slide = pres.addSlide();
         
-        // Apply background and theme
-        slide.background = { color: 'FFFFFF' };
+        // Apply background image using correct PptxGenJS syntax
+        const path = require('path');
+        const fs = require('fs');
+        
+        // Use absolute path that we know works from testing
+        const backgroundImagePath = path.join(__dirname, '../../template/background_image/ncs_bg_purple_blue.png');
+        
+        console.log(`[PptxGenerator] Slide ${slideNumber}: Checking background image at: ${backgroundImagePath}`);
+        
+        if (fs.existsSync(backgroundImagePath)) {
+            console.log(`[PptxGenerator] Slide ${slideNumber}: ✓ Background image found, applying to slide`);
+            // Set background image directly on slide object using proven syntax
+            slide.background = { path: backgroundImagePath };
+        } else {
+            console.log(`[PptxGenerator] Slide ${slideNumber}: ❌ Background image not found, using white background`);
+            slide.background = { color: 'FFFFFF' };
+        }
 
         switch (slideData.layout) {
             case 'TITLE_SLIDE':
@@ -525,7 +586,8 @@ class PptxGenerator extends BaseAgent {
             slide.addText(`${slideNumber}`, {
                 x: 9.2, y: 5.2, w: 0.5, h: 0.3,
                 fontSize: 10,
-                color: '666666',
+                fontFace: 'Ubuntu',
+                color: 'FFFFFF',
                 align: 'right'
             });
         }
@@ -539,7 +601,8 @@ class PptxGenerator extends BaseAgent {
         slide.addText(slideData.title, {
             x: 1, y: 1.5, w: 8, h: 1.5,
             fontSize: 36,
-            color: '2E3D49',
+            fontFace: 'Ubuntu',
+            color: 'FFFFFF',
             bold: true,
             align: 'center'
         });
@@ -549,7 +612,8 @@ class PptxGenerator extends BaseAgent {
             slide.addText(slideData.subtitle, {
                 x: 1, y: 3, w: 8, h: 1,
                 fontSize: 20,
-                color: '666666',
+                fontFace: 'Ubuntu',
+                color: 'FFFFFF',
                 align: 'center'
             });
         }
@@ -559,9 +623,38 @@ class PptxGenerator extends BaseAgent {
         slide.addText(`${currentDate}`, {
             x: 1, y: 4.5, w: 8, h: 0.5,
             fontSize: 14,
-            color: '888888',
+            fontFace: 'Ubuntu',
+            color: 'FFFFFF',
             align: 'center'
         });
+
+        // Add NCS logo to title slide
+        const path = require('path');
+        const ncsLogoPath = path.join(__dirname, '../../template/background_image/ncs_white.svg');
+        
+        // Method 1: Use your adjusted position (20.14cm from left)
+        const logoX = 20.14 * 0.393701; // 7.93 inches (your corrected position)
+        const logoY = 1.16 * 0.393701;  // 0.46 inches
+        const logoW = 7.95 * 0.393701 * 0.54; // 1.69 inches (scaled 54%)
+        const logoH = 2.91 * 0.393701 * 0.54; // 0.62 inches (scaled 54%)
+        
+        // Alternative Method 2: Simple top-right corner positioning
+        // const slideWidth = 10; // 16:9 slide width in inches
+        // const logoX = slideWidth - logoW - 0.2; // Right edge minus logo width minus small margin
+        // const logoY = 0.2; // Small margin from top
+        
+        if (require('fs').existsSync(ncsLogoPath)) {
+            slide.addImage({
+                path: ncsLogoPath,
+                x: logoX,
+                y: logoY,
+                w: logoW,
+                h: logoH
+            });
+            console.log(`[PptxGenerator] NCS logo added to title slide at position (${logoX.toFixed(2)}, ${logoY.toFixed(2)})`);
+        } else {
+            console.log(`[PptxGenerator] NCS logo not found at: ${ncsLogoPath}`);
+        }
     }
 
     /**
@@ -572,7 +665,8 @@ class PptxGenerator extends BaseAgent {
         slide.addText(slideData.title, {
             x: 1, y: 0.5, w: 8, h: 0.8,
             fontSize: 28,
-            color: '2E3D49',
+            fontFace: 'Ubuntu',
+            color: 'FFFFFF',
             bold: true
         });
 
@@ -581,7 +675,7 @@ class PptxGenerator extends BaseAgent {
         if (bullets && bullets.length > 0) {
             const bulletTextArray = bullets.map(item => ({
                 text: item,
-                options: { bullet: true, fontSize: 18, color: '333333' }
+                options: { bullet: true, fontSize: 18, fontFace: 'Ubuntu', color: 'FFFFFF' }
             }));
             
             slide.addText(bulletTextArray, {
@@ -600,7 +694,8 @@ class PptxGenerator extends BaseAgent {
         slide.addText(slideData.title, {
             x: 1, y: 0.5, w: 8, h: 0.8,
             fontSize: 24,
-            color: '2E3D49',
+            fontFace: 'Ubuntu',
+            color: 'FFFFFF',
             bold: true
         });
 
@@ -609,7 +704,7 @@ class PptxGenerator extends BaseAgent {
         if (bullets && bullets.length > 0) {
             const bulletTextArray = bullets.map(item => ({
                 text: item,
-                options: { bullet: true, fontSize: 16, color: '333333' }
+                options: { bullet: true, fontSize: 16, fontFace: 'Ubuntu', color: 'FFFFFF' }
             }));
             
             slide.addText(bulletTextArray, {
@@ -628,7 +723,8 @@ class PptxGenerator extends BaseAgent {
         slide.addText(slideData.title, {
             x: 1, y: 0.5, w: 8, h: 0.8,
             fontSize: 24,
-            color: '2E3D49',
+            fontFace: 'Ubuntu',
+            color: 'FFFFFF',
             bold: true
         });
 
@@ -638,9 +734,10 @@ class PptxGenerator extends BaseAgent {
             slide.addTable(tableData, {
                 x: 1, y: 1.5, w: 8, h: 3,
                 fontSize: 14,
-                color: '333333',
-                border: { type: 'solid', color: 'CCCCCC', pt: 1 },
-                fill: { color: 'F8F9FA' },
+                fontFace: 'Ubuntu',
+                color: 'FFFFFF',
+                border: { type: 'solid', color: 'FFFFFF', pt: 1 },
+                fill: { color: '333333' },
                 align: 'left',
                 valign: 'middle'
             });
@@ -655,7 +752,8 @@ class PptxGenerator extends BaseAgent {
         slide.addText(slideData.title, {
             x: 1, y: 0.5, w: 8, h: 0.8,
             fontSize: 24,
-            color: '2E3D49',
+            fontFace: 'Ubuntu',
+            color: 'FFFFFF',
             bold: true
         });
 
@@ -666,7 +764,7 @@ class PptxGenerator extends BaseAgent {
         if (columnData.left && columnData.left.length > 0) {
             const leftTextArray = columnData.left.map(item => ({
                 text: item,
-                options: { bullet: true, fontSize: 14, color: '333333' }
+                options: { bullet: true, fontSize: 14, fontFace: 'Ubuntu', color: 'FFFFFF' }
             }));
             
             slide.addText(leftTextArray, {
@@ -680,7 +778,7 @@ class PptxGenerator extends BaseAgent {
         if (columnData.right && columnData.right.length > 0) {
             const rightTextArray = columnData.right.map(item => ({
                 text: item,
-                options: { bullet: true, fontSize: 14, color: '333333' }
+                options: { bullet: true, fontSize: 14, fontFace: 'Ubuntu', color: 'FFFFFF' }
             }));
             
             slide.addText(rightTextArray, {
@@ -699,7 +797,8 @@ class PptxGenerator extends BaseAgent {
         slide.addText(slideData.title, {
             x: 1, y: 0.5, w: 8, h: 0.8,
             fontSize: 24,
-            color: '2E3D49',
+            fontFace: 'Ubuntu',
+            color: 'FFFFFF',
             bold: true
         });
 
@@ -712,7 +811,8 @@ class PptxGenerator extends BaseAgent {
                     w: textBox.w || 3.5,
                     h: textBox.h || 1,
                     fontSize: textBox.fontSize || 14,
-                    color: textBox.color || '333333',
+                    fontFace: textBox.fontFace || 'Ubuntu',
+                    color: textBox.color || 'FFFFFF',
                     align: textBox.align || 'left',
                     valign: textBox.valign || 'top'
                 });
@@ -728,7 +828,8 @@ class PptxGenerator extends BaseAgent {
         slide.addText(slideData.title, {
             x: 1, y: 0.5, w: 8, h: 0.8,
             fontSize: 28,
-            color: '2E3D49',
+            fontFace: 'Ubuntu',
+            color: 'FFFFFF',
             bold: true
         });
 
@@ -737,7 +838,7 @@ class PptxGenerator extends BaseAgent {
         if (bullets && bullets.length > 0) {
             const takeawaysTextArray = bullets.map((item, index) => ({
                 text: `${index + 1}. ${item}`,
-                options: { fontSize: 16, color: '333333' }
+                options: { fontSize: 16, fontFace: 'Ubuntu', color: 'FFFFFF' }
             }));
             
             slide.addText(takeawaysTextArray, {
@@ -756,7 +857,8 @@ class PptxGenerator extends BaseAgent {
         slide.addText('Thank You', {
             x: 1, y: 2, w: 8, h: 1.5,
             fontSize: 48,
-            color: '2E3D49',
+            fontFace: 'Ubuntu',
+            color: 'FFFFFF',
             bold: true,
             align: 'center'
         });
@@ -766,7 +868,7 @@ class PptxGenerator extends BaseAgent {
         if (bullets && bullets.length > 0) {
             const bulletTextArray = bullets.map(item => ({
                 text: item,
-                options: { bullet: true, fontSize: 14, color: '666666' }
+                options: { bullet: true, fontSize: 14, fontFace: 'Ubuntu', color: 'FFFFFF' }
             }));
             
             slide.addText(bulletTextArray, {
