@@ -1,6 +1,6 @@
-# Document Tag Usage Guide
+# Document Tag and Bracket Notation Guide
 
-This guide explains how to use document tags with the PowerPoint Generation Service v2.
+This guide explains how to use document tags and bracket notation with the PowerPoint Generation Service v2.
 
 ## New Document Tag Format
 
@@ -116,3 +116,105 @@ node test/test-document-tags.js
 ```
 
 This will verify that document extraction works correctly with both new and legacy formats.
+
+## Bracket Notation for Frontend Integration
+
+The service uses special bracket notation for exact frontend trigger matching:
+
+### Action Triggers
+
+#### 1. Create Presentation Trigger
+```json
+{
+  "user_message": "[create_presentation]",
+  "conversation_history": [conversation_data],
+  "session_id": "session-123",
+  "entra_id": "user-id"
+}
+```
+
+**Response**: Clarification questions popup with AI slide recommendations
+
+#### 2. Clarification Answers Trigger
+```json
+{
+  "user_message": "[clarification_answers]{\"slide_count\": 12, \"audience_level\": \"Intermediate\", \"include_examples\": true}",
+  "conversation_history": [same_conversation_data],
+  "session_id": "session-123", 
+  "entra_id": "user-id"
+}
+```
+
+**Response**: Customized PowerPoint generation based on user answers
+
+### Bracket Notation Rules
+
+1. **Exact Matching**: Brackets must match exactly `[create_presentation]`
+2. **No Spaces**: No extra spaces inside brackets
+3. **Case Sensitive**: Use exact case as specified
+4. **JSON Format**: Answers must be valid JSON after `[clarification_answers]`
+
+### Conversation History Format
+
+The service expects conversation history in this format:
+
+```json
+{
+  "conversation_history": [
+    {
+      "session_id": "session-123",
+      "total_questions": 3,
+      "conversation": [
+        {
+          "question_id": "uuid-1",
+          "question": "Tell me about robotics in workplace",
+          "response_id": "uuid-2", 
+          "response": "Robotics in workplace involves automation...",
+          "response_timestamp": "2025-07-29T06:02:15.905Z"
+        },
+        {
+          "question_id": "uuid-3",
+          "question": "What about the history of robotics?",
+          "response_id": "uuid-4",
+          "response": "The history of robotics spans from ancient myths...",
+          "response_timestamp": "2025-07-29T06:02:41.329Z"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Combined Usage: Documents + Bracket Notation
+
+You can combine document tags with bracket notation:
+
+```json
+{
+  "user_message": "[create_presentation] Based on this quarterly report: [document_start]Q3 2024 Results...[document_end]",
+  "conversation_history": [conversation_data],
+  "session_id": "session-123",
+  "entra_id": "user-id"
+}
+```
+
+The service will:
+1. Detect the `[create_presentation]` trigger
+2. Extract document content from `[document_start]...[document_end]`
+3. Generate clarification questions based on both conversation and document content
+
+### Testing Bracket Notation
+
+Use the updated test scripts:
+
+```bash
+cd azure_function_ppt_v2
+
+# Test 2-stage clarification workflow with brackets
+node test/test-clarification-workflow.js
+
+# Test document tags with brackets
+node test/test-document-tags.js
+```
+
+Both document tags and bracket notation work together to provide a complete frontend integration solution.

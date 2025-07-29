@@ -1,7 +1,7 @@
 # Frontend API Integration Guide
-## PowerPoint Generation Service v2
+## PowerPoint Generation Service v2 - 2-Stage Clarification Workflow
 
-Guide for integrating the conversational PowerPoint generation API into frontend applications.
+Guide for integrating the new 2-stage clarification PowerPoint generation API into frontend applications.
 
 ## API Endpoint
 
@@ -9,342 +9,547 @@ Guide for integrating the conversational PowerPoint generation API into frontend
 **Method:** `POST`
 **Content-Type:** `application/json`
 
-## Request Format
+## New 2-Stage Workflow Overview
 
+The API now uses a 2-stage workflow for better user experience:
+
+1. **Stage 1**: User clicks "Create Presentation" → AI analyzes conversation → Shows clarification questions popup
+2. **Stage 2**: User answers questions → Generates customized PowerPoint presentation
+
+## Stage 1: Get Clarification Questions
+
+### Request Format
 ```javascript
 {
-  "user_message": "Create a presentation [document]base64_content",
+  "user_message": "[create_presentation]",
   "entra_id": "user-123",
-  "session_id": "optional-session-id", // Auto-generated if not provided
-  "conversation_history": [] // Array of previous messages
+  "session_id": "session-abc-123",
+  "conversation_history": [
+    {
+      "session_id": "session-abc-123",
+      "total_questions": 3,
+      "conversation": [
+        {
+          "question_id": "uuid-1",
+          "question": "Tell me about AI in business",
+          "response_id": "uuid-2",
+          "response": "AI transforms business operations through automation...",
+          "response_timestamp": "2025-07-29T06:02:15.905Z"
+        }
+      ]
+    }
+  ]
 }
 ```
 
-## Response Structure
-
+### Stage 1 Response Structure
 ```javascript
 {
   "response_data": {
-    "status": "completed", // "processing", "completed", "error"
-    "session_id": "generated-session-id",
-    "conversation_history": [], // Updated conversation array
-    "pipeline_info": ["ConversationManager", "SlideEstimator"], // Which agents ran
-    "processing_info": {
-      "conversation": {
-        "should_generate_presentation": false,
-        "has_document_content": true,
-        "response_text": "What kind of presentation would work best?",
-        "user_context": "..."
+    "status": "completed",
+    "session_id": "session-abc-123",
+    "show_clarification_popup": true,
+    "clarification_questions": [
+      {
+        "id": "slide_count",
+        "question": "How many slides would you like in your presentation? (Recommended: 12 slides based on AI analysis of your content)",
+        "field_type": "number",
+        "placeholder": "12",
+        "required": true,
+        "default_value": 12,
+        "validation": {"min": 5, "max": 50},
+        "recommendation": 12,
+        "recommendation_source": "AI analysis of your content",
+        "ai_generated": true
       },
-      "slide_estimate": {
-        "estimated_slides": 8,
-        "reasoning": "Based on content complexity..."
+      {
+        "id": "audience_level",
+        "question": "What is the technical level of your audience?",
+        "field_type": "select",
+        "options": ["Beginner", "Intermediate", "Advanced", "Mixed audience"],
+        "required": true,
+        "default_value": "Intermediate"
+      },
+      {
+        "id": "include_examples",
+        "question": "Would you like detailed examples and case studies included?",
+        "field_type": "boolean",
+        "required": true,
+        "default_value": true
+      },
+      {
+        "id": "business_style",
+        "question": "What type of business presentation format do you prefer?",
+        "field_type": "select",
+        "options": ["Executive Summary", "Detailed Analysis", "Strategic Overview", "Training Material"],
+        "required": true,
+        "default_value": "Strategic Overview"
       }
-    },
-    "response_text": "Based on your document, I estimate...",
-    "powerpoint_output": null // Only present when presentation is generated
-  }
-}
-```
-
-## Conversation Flow
-
-### 1. Document Upload + Question
-```javascript
-const response1 = await fetch(API_URL, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    user_message: "What kind of presentation works best? [document]" + base64Content,
-    entra_id: userId
-  })
-});
-
-// Response: Conversational response with slide estimate
-// should_generate_presentation: false
-// powerpoint_output: null
-```
-
-### 2. Follow-up Conversation
-```javascript
-const response2 = await fetch(API_URL, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    user_message: "Focus on implementation timeline and metrics",
-    session_id: response1.response_data.session_id,
-    conversation_history: response1.response_data.conversation_history,
-    entra_id: userId
-  })
-});
-
-// Response: Updated context and refined slide estimate
-// should_generate_presentation: false
-// powerpoint_output: null
-```
-
-### 3. Generate Presentation
-```javascript
-const response3 = await fetch(API_URL, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    user_message: "Create the presentation now",
-    session_id: response2.response_data.session_id,
-    conversation_history: response2.response_data.conversation_history,
-    entra_id: userId
-  })
-});
-
-// Response: Full pipeline execution with PowerPoint file
-// should_generate_presentation: true
-// powerpoint_output: { base64_content, filename, file_size_kb, slide_count }
-```
-
-## PowerPoint Output Structure
-
-When `should_generate_presentation: true`, the response includes:
-
-```javascript
-{
-  "powerpoint_output": {
-    "base64_content": "UEsDBBQAAAAIA...", // Base64 encoded .pptx file
-    "filename": "presentation_ABC123_20250128.pptx",
-    "file_size_kb": 1247,
-    "slide_count": 8,
-    "generation_info": {
-      "template_used": "ncs_ppt_template_2023",
-      "total_processing_time": "12.3s",
-      "agent_pipeline": ["ConversationManager", "DocumentProcessor", "SlideEstimator", "ContentStructurer", "PptxGenerator"]
+    ],
+    "pipeline_info": ["ConversationManager", "SlideEstimator"],
+    "processing_info": {
+      "slide_estimate": {
+        "estimated_slides": 12,
+        "content_complexity": "medium",
+        "reasoning": "Based on conversation content length and business context"
+      }
     }
   }
 }
 ```
 
-## Frontend Implementation Examples
+## Stage 2: Generate Presentation with Answers
 
-### React Hook for Conversation
+### Request Format
 ```javascript
-const usePowerPointConversation = () => {
+{
+  "user_message": "[clarification_answers]{\"slide_count\": 15, \"audience_level\": \"Advanced\", \"include_examples\": true, \"business_style\": \"Strategic Overview\"}",
+  "entra_id": "user-123", 
+  "session_id": "session-abc-123",
+  "conversation_history": [same_as_stage_1]
+}
+```
+
+### Stage 2 Response Structure
+```javascript
+{
+  "response_data": {
+    "status": "completed",
+    "session_id": "session-abc-123",
+    "pipeline_info": ["ConversationManager", "DocumentProcessor", "SlideEstimator (user choice)", "ContentStructurer", "PptxGenerator"],
+    "processing_info": {
+      "slide_estimate": {
+        "estimated_slides": 15,
+        "content_complexity": "user_specified",
+        "reasoning": "User chose 15 slides from clarification popup",
+        "user_specified": true
+      }
+    },
+    "powerpoint_output": {
+      "base64_content": "UEsDBBQAAAAIA...",
+      "filename": "presentation_PPTV220250729ABC123_20250729.pptx",
+      "file_size_kb": 1247,
+      "slide_count": 15,
+      "generation_info": {
+        "template_used": "ncs_ppt_template_2023",
+        "total_processing_time": "8.7s",
+        "customization_applied": {
+          "audience_level": "Advanced",
+          "include_examples": true,
+          "business_style": "Strategic Overview"
+        }
+      }
+    },
+    "response_text": "PowerPoint presentation generated successfully!\n\nPresentation Details:\n- Slides: 15\n- File: presentation_PPTV220250729ABC123_20250729.pptx\n- Size: 1247KB\n\nYour presentation is ready for download."
+  }
+}
+```
+
+## Frontend Implementation
+
+### React Hook for 2-Stage Workflow
+```javascript
+const usePowerPointClarificationWorkflow = () => {
+  const [stage, setStage] = useState('ready'); // 'ready', 'questions', 'generating', 'completed'
   const [sessionId, setSessionId] = useState(null);
-  const [history, setHistory] = useState([]);
+  const [conversationHistory, setConversationHistory] = useState([]);
+  const [clarificationQuestions, setClarificationQuestions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const sendMessage = async (message, userId) => {
+  const API_URL = 'https://fnncsgptpptagent-v2.azurewebsites.net/api/powerpointGeneration';
+
+  // Stage 1: Get clarification questions
+  const requestClarificationQuestions = async (conversationData, userId) => {
     setIsLoading(true);
-    
+    setStage('questions');
+
     try {
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_message: message,
-          session_id: sessionId,
-          conversation_history: history,
+          user_message: '[create_presentation]',
+          conversation_history: [conversationData],
+          session_id: conversationData.session_id,
           entra_id: userId
         })
       });
 
       const data = await response.json();
       
-      setSessionId(data.response_data.session_id);
-      setHistory(data.response_data.conversation_history);
+      if (data.response_data.show_clarification_popup) {
+        setSessionId(data.response_data.session_id);
+        setConversationHistory([conversationData]);
+        setClarificationQuestions(data.response_data.clarification_questions);
+        return data.response_data.clarification_questions;
+      }
       
-      return data.response_data;
+      throw new Error('Unexpected response format');
     } catch (error) {
-      console.error('API call failed:', error);
+      console.error('Stage 1 failed:', error);
+      setStage('ready');
       throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  return { sendMessage, sessionId, history, isLoading };
-};
-```
-
-### File Download Handler
-```javascript
-const downloadPowerPoint = (powerpoint_output) => {
-  if (!powerpoint_output?.base64_content) {
-    console.error('No PowerPoint data to download');
-    return;
-  }
-
-  // Convert base64 to blob
-  const binaryString = atob(powerpoint_output.base64_content);
-  const bytes = new Uint8Array(binaryString.length);
-  
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-
-  const blob = new Blob([bytes], { 
-    type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' 
-  });
-
-  // Create download link
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = powerpoint_output.filename;
-  link.click();
-  
-  // Cleanup
-  URL.revokeObjectURL(url);
-};
-```
-
-### Complete Chat Interface
-```javascript
-const PowerPointChat = ({ userId, documentBase64 }) => {
-  const { sendMessage, history, isLoading } = usePowerPointConversation();
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-
-  const handleSend = async () => {
-    if (!input.trim()) return;
-
-    // Add user message to UI
-    const userMessage = { role: 'user', content: input, timestamp: new Date() };
-    setMessages(prev => [...prev, userMessage]);
+  // Stage 2: Generate presentation with answers
+  const generatePresentationWithAnswers = async (answers, userId) => {
+    setIsLoading(true);
+    setStage('generating');
 
     try {
-      // Send to API (include document on first message)
-      const isFirstMessage = messages.length === 0;
-      const messageWithDoc = isFirstMessage && documentBase64 
-        ? `${input} [document]${documentBase64}`
-        : input;
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_message: `[clarification_answers]${JSON.stringify(answers)}`,
+          conversation_history: conversationHistory,
+          session_id: sessionId,
+          entra_id: userId
+        })
+      });
 
-      const response = await sendMessage(messageWithDoc, userId);
+      const data = await response.json();
       
-      // Add assistant response to UI
-      const assistantMessage = { 
-        role: 'assistant', 
-        content: response.response_text,
-        timestamp: new Date(),
-        powerpoint_output: response.powerpoint_output 
-      };
-      setMessages(prev => [...prev, assistantMessage]);
-
-      setInput('');
+      if (data.response_data.powerpoint_output) {
+        setStage('completed');
+        return data.response_data;
+      }
+      
+      throw new Error('PowerPoint generation failed');
     } catch (error) {
-      console.error('Failed to send message:', error);
+      console.error('Stage 2 failed:', error);
+      setStage('questions');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetWorkflow = () => {
+    setStage('ready');
+    setSessionId(null);
+    setConversationHistory([]);
+    setClarificationQuestions([]);
+  };
+
+  return {
+    stage,
+    clarificationQuestions,
+    requestClarificationQuestions,
+    generatePresentationWithAnswers,
+    resetWorkflow,
+    isLoading
+  };
+};
+```
+
+### Clarification Questions Modal Component
+```javascript
+const ClarificationQuestionsModal = ({ questions, onSubmit, onCancel, isLoading }) => {
+  const [answers, setAnswers] = useState({});
+
+  useEffect(() => {
+    // Initialize with default values
+    const defaultAnswers = {};
+    questions.forEach(q => {
+      defaultAnswers[q.id] = q.default_value;
+    });
+    setAnswers(defaultAnswers);
+  }, [questions]);
+
+  const handleSubmit = () => {
+    // Validate required fields
+    const missingRequired = questions.filter(q => 
+      q.required && (answers[q.id] === undefined || answers[q.id] === '')
+    );
+    
+    if (missingRequired.length > 0) {
+      alert(`Please answer: ${missingRequired.map(q => q.question).join(', ')}`);
+      return;
+    }
+
+    onSubmit(answers);
+  };
+
+  const renderField = (question) => {
+    switch (question.field_type) {
+      case 'number':
+        return (
+          <input
+            type="number"
+            value={answers[question.id] || ''}
+            onChange={(e) => setAnswers(prev => ({
+              ...prev, 
+              [question.id]: parseInt(e.target.value)
+            }))}
+            min={question.validation?.min}
+            max={question.validation?.max}
+            placeholder={question.placeholder}
+            required={question.required}
+          />
+        );
+
+      case 'select':
+        return (
+          <select
+            value={answers[question.id] || ''}
+            onChange={(e) => setAnswers(prev => ({
+              ...prev,
+              [question.id]: e.target.value
+            }))}
+            required={question.required}
+          >
+            {question.options.map(option => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        );
+
+      case 'boolean':
+        return (
+          <label>
+            <input
+              type="checkbox"
+              checked={answers[question.id] || false}
+              onChange={(e) => setAnswers(prev => ({
+                ...prev,
+                [question.id]: e.target.checked
+              }))}
+            />
+            Yes
+          </label>
+        );
+
+      default:
+        return (
+          <input
+            type="text"
+            value={answers[question.id] || ''}
+            onChange={(e) => setAnswers(prev => ({
+              ...prev,
+              [question.id]: e.target.value
+            }))}
+            placeholder={question.placeholder}
+            required={question.required}
+          />
+        );
     }
   };
 
   return (
-    <div className="powerpoint-chat">
-      <div className="messages">
-        {messages.map((msg, idx) => (
-          <div key={idx} className={`message ${msg.role}`}>
-            <p>{msg.content}</p>
-            {msg.powerpoint_output && (
-              <button onClick={() => downloadPowerPoint(msg.powerpoint_output)}>
-                Download {msg.powerpoint_output.filename}
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-      
-      <div className="input-area">
-        <input 
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="Ask about your presentation..."
-          disabled={isLoading}
-        />
-        <button onClick={handleSend} disabled={isLoading}>
-          {isLoading ? 'Processing...' : 'Send'}
-        </button>
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <h2>Customize Your Presentation</h2>
+        <p>Please answer these questions to create the perfect presentation for you:</p>
+        
+        <form>
+          {questions.map(question => (
+            <div key={question.id} className="question-field">
+              <label>
+                {question.question}
+                {question.required && <span className="required">*</span>}
+              </label>
+              {renderField(question)}
+              {question.ai_generated && (
+                <small className="ai-recommendation">
+                  ✨ {question.recommendation_source}
+                </small>
+              )}
+            </div>
+          ))}
+        </form>
+
+        <div className="modal-actions">
+          <button onClick={onCancel} disabled={isLoading}>
+            Cancel
+          </button>
+          <button onClick={handleSubmit} disabled={isLoading}>
+            {isLoading ? 'Generating...' : 'Create Presentation'}
+          </button>
+        </div>
       </div>
     </div>
   );
 };
 ```
 
-## Document Processing
-
-### File to Base64 Conversion
+### Complete Workflow Component
 ```javascript
-const fileToBase64 = (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result.split(',')[1]; // Remove data:mime;base64, prefix
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-};
+const PowerPointWorkflowComponent = ({ conversationData, userId }) => {
+  const {
+    stage,
+    clarificationQuestions,
+    requestClarificationQuestions,
+    generatePresentationWithAnswers,
+    resetWorkflow,
+    isLoading
+  } = usePowerPointClarificationWorkflow();
 
-// Usage
-const handleFileUpload = async (event) => {
-  const file = event.target.files[0];
-  if (file && (file.type === 'application/pdf' || file.type.includes('word'))) {
-    const base64Content = await fileToBase64(file);
-    setDocumentBase64(base64Content);
-  }
+  const [presentationResult, setPresentationResult] = useState(null);
+
+  const handleCreatePresentation = async () => {
+    try {
+      await requestClarificationQuestions(conversationData, userId);
+    } catch (error) {
+      alert('Failed to get clarification questions: ' + error.message);
+    }
+  };
+
+  const handleAnswersSubmit = async (answers) => {
+    try {
+      const result = await generatePresentationWithAnswers(answers, userId);
+      setPresentationResult(result);
+    } catch (error) {
+      alert('Failed to generate presentation: ' + error.message);
+    }
+  };
+
+  const downloadPresentation = () => {
+    if (!presentationResult?.powerpoint_output) return;
+
+    const { base64_content, filename } = presentationResult.powerpoint_output;
+    
+    // Convert base64 to blob
+    const binaryString = atob(base64_content);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    const blob = new Blob([bytes], { 
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' 
+    });
+
+    // Create download link
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="powerpoint-workflow">
+      {stage === 'ready' && (
+        <button 
+          onClick={handleCreatePresentation}
+          disabled={isLoading}
+          className="create-presentation-btn"
+        >
+          {isLoading ? 'Analyzing...' : 'Create Presentation'}
+        </button>
+      )}
+
+      {stage === 'questions' && (
+        <ClarificationQuestionsModal
+          questions={clarificationQuestions}
+          onSubmit={handleAnswersSubmit}
+          onCancel={resetWorkflow}
+          isLoading={isLoading}
+        />
+      )}
+
+      {stage === 'generating' && (
+        <div className="generating-state">
+          <div className="spinner"></div>
+          <p>Generating your customized presentation...</p>
+          <small>This typically takes 6-9 seconds</small>
+        </div>
+      )}
+
+      {stage === 'completed' && presentationResult && (
+        <div className="completion-state">
+          <h3>✅ Presentation Ready!</h3>
+          <p>{presentationResult.response_text}</p>
+          <div className="presentation-details">
+            <p><strong>Slides:</strong> {presentationResult.powerpoint_output.slide_count}</p>
+            <p><strong>File:</strong> {presentationResult.powerpoint_output.filename}</p>
+            <p><strong>Size:</strong> {presentationResult.powerpoint_output.file_size_kb}KB</p>
+          </div>
+          <div className="actions">
+            <button onClick={downloadPresentation} className="download-btn">
+              Download Presentation
+            </button>
+            <button onClick={resetWorkflow} className="create-another-btn">
+              Create Another
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+```
+
+## Conversation History Format
+
+The API expects conversation history in this specific format:
+
+```javascript
+const conversationData = {
+  session_id: "unique-session-id",
+  total_questions: 3,
+  conversation: [
+    {
+      question_id: "uuid-1",
+      question: "Tell me about AI in business",
+      response_id: "uuid-2", 
+      response: "AI transforms business operations through automation, data analysis...",
+      response_timestamp: "2025-07-29T06:02:15.905Z"
+    },
+    {
+      question_id: "uuid-3",
+      question: "What are the key benefits?",
+      response_id: "uuid-4",
+      response: "Key benefits include increased efficiency, cost reduction...",
+      response_timestamp: "2025-07-29T06:02:41.329Z"
+    }
+  ]
 };
 ```
 
 ## Error Handling
 
 ```javascript
-const handleApiResponse = (response) => {
-  if (response.response_data.status === 'error') {
-    throw new Error(response.response_data.error_message);
-  }
+const handleApiError = (error, stage) => {
+  console.error(`Stage ${stage} error:`, error);
   
-  if (response.response_data.status === 'processing') {
-    // Handle processing state if needed
-    console.log('Request is still processing...');
+  // Show user-friendly error messages
+  switch (stage) {
+    case 1:
+      return "Unable to analyze your conversation. Please try again.";
+    case 2:
+      return "Unable to generate presentation. Please check your answers and try again.";
+    default:
+      return "An unexpected error occurred. Please try again.";
   }
-  
-  return response.response_data;
 };
 ```
 
-## Response State Management
+## Performance Considerations
 
-Track conversation state based on API responses:
+- **Stage 1**: Typically takes 2-3 seconds (AI slide recommendation)
+- **Stage 2**: Typically takes 6-9 seconds (full presentation generation)
+- **Total Experience**: 8-12 seconds with user interaction
+- **File Sizes**: Generated presentations are typically 800KB - 2MB
+- **Concurrent Limits**: Azure Function handles multiple simultaneous requests
 
-```javascript
-const getConversationState = (responseData) => {
-  const hasDocument = responseData.processing_info?.conversation?.has_document_content;
-  const shouldGenerate = responseData.processing_info?.conversation?.should_generate_presentation;
-  const hasOutput = !!responseData.powerpoint_output;
+## Integration Checklist
 
-  if (hasOutput) return 'completed';
-  if (shouldGenerate) return 'generating';
-  if (hasDocument) return 'discussing';
-  return 'initial';
-};
+- [ ] Implement 2-stage workflow (questions → generation)
+- [ ] Handle conversation history format correctly
+- [ ] Use exact bracket notation triggers
+- [ ] Implement clarification questions modal
+- [ ] Handle all field types (number, select, boolean)
+- [ ] Implement file download functionality
+- [ ] Add proper error handling for both stages
+- [ ] Show loading states during processing
+- [ ] Test with different conversation content types
+- [ ] Validate user inputs before submission
 
-// Use state to show appropriate UI
-const state = getConversationState(response);
-switch (state) {
-  case 'initial': 
-    return <DocumentUpload />;
-  case 'discussing': 
-    return <ConversationInterface />;
-  case 'generating': 
-    return <GeneratingSpinner />;
-  case 'completed': 
-    return <DownloadInterface />;
-}
-```
-
-## Key Integration Points
-
-1. **Session Management**: Always pass `session_id` and `conversation_history` for context
-2. **Document Handling**: Include `[document]base64_content` in first message only
-3. **State Detection**: Use `should_generate_presentation` to determine when PowerPoint is ready
-4. **File Download**: Convert `base64_content` to blob for browser download
-5. **Error Handling**: Check `status` field for error states
-6. **Loading States**: API calls typically take 2-15 seconds depending on complexity
-
-The API supports full conversational flow - upload document, discuss requirements, refine context, then generate presentation when ready.
+The new 2-stage workflow provides much better user experience with AI-powered recommendations and customizable presentation generation based on user preferences.

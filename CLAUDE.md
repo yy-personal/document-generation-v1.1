@@ -70,12 +70,12 @@ Each service can be tested independently:
 
 ### PowerPoint Generation Service v2 (azure_function_ppt_v2/)
 - **Endpoint**: `/api/powerpointGeneration`
-- **Pipeline**: 5 AI agents (ConversationManager → DocumentProcessor → SlideEstimator → ContentStructurer → PptxGenerator)
-- **Output**: Conversational PowerPoint generation with enhanced formatting
-- **Processing time**: Variable based on conversation complexity
-- **Key Feature**: Multi-turn conversations for iterative presentation refinement
-- **Technology**: Node.js with PptxGenJS library (in development)
-- **Status**: Core agent pipeline complete, PptxGenJS integration pending
+- **Pipeline**: 2-stage clarification workflow with 5 AI agents
+- **Output**: Customized PowerPoint presentations based on user preferences
+- **Processing time**: 8-12 seconds (Stage 1: 2-3s, Stage 2: 6-9s)
+- **Key Feature**: Interactive clarification questions for presentation customization
+- **Technology**: Node.js with PptxGenJS library
+- **Status**: Production ready with full clarification workflow
 
 ## Key Configuration Files
 
@@ -106,29 +106,53 @@ Both services use Semantic Kernel with specialized agents operating in sequentia
    - **DocumentQuickSummarySkill** - Fast text summaries for information requests
 3. **MarkdownFormatterAgent** - PDF generation with reportlab
 
-### PowerPoint Service Pipeline (5 steps, 4 AI calls)
+### PowerPoint Service v1 Pipeline (5 steps, 4 AI calls)
 1. **SmartPresentationProcessor** - Intent classification only
 2. **DocumentContentExtractor** - Content organization and topic extraction
 3. **PresentationStructureAgent** - Content analysis + optimal slide count determination (3-30 slides)
 4. **SlideContentGenerator** - Detailed slide content creation
 5. **PowerPointBuilderAgent** - Rule-based .pptx file generation with python-pptx
 
+### PowerPoint Service v2 Pipeline (2-Stage Clarification Workflow)
+
+**Stage 1: Clarification Questions** (3-4 seconds)
+1. **ConversationManager** - Detects `[create_presentation]` trigger
+2. **SlideEstimator** - AI-powered slide count recommendation
+3. **ConversationManager** - Generates up to 5 contextual clarification questions
+4. **Frontend Response** - Shows popup with questions and AI recommendations
+
+**Stage 2: Customized Generation** (6-9 seconds) 
+1. **ConversationManager** - Processes `[clarification_answers]` with user preferences
+2. **DocumentProcessor** - Content extraction and organization with user context
+3. **Slide Decision** - Uses user-specified slide count (skips SlideEstimator)
+4. **ContentStructurer** - Structures content based on user preferences
+5. **PptxGenerator** - Creates PowerPoint with PptxGenJS library
+
 ## Input/Output Formats
 
 ### Input Format
+
+**PDF and PowerPoint v1 Services:**
 - PDF documents (.pdf) via base64 encoding
 - Word documents (.docx) via base64 encoding  
 - Message format: `[document]base64_content` or `user_question[document]base64_content`
-- Test scripts handle file conversion to base64 format
+
+**PowerPoint v2 Service (Clarification Workflow):**
+- **Stage 1**: `[create_presentation]` with conversation history
+- **Stage 2**: `[clarification_answers]{JSON_answers}` with user preferences
+- **Conversation History Format**: Q&A pairs from frontend chat
 
 ### Output Format
 - **PDF service**: Base64 encoded PDF reports + JSON response with text summaries
-- **PowerPoint service**: Base64 encoded .pptx files + JSON response with metadata
-- Test scripts can save output files locally for validation
+- **PowerPoint v1**: Base64 encoded .pptx files + JSON response with metadata
+- **PowerPoint v2 Stage 1**: Clarification questions array with field types and AI recommendations
+- **PowerPoint v2 Stage 2**: Base64 encoded .pptx files + customization metadata
 
 ## Agent Configuration Patterns
 
 ### Token Limits by Agent Type
+
+**Python Services:**
 ```python
 # Intent/routing agents (lower tokens)
 "SmartIntentProcessor": {"max_tokens": 5000}
@@ -141,6 +165,20 @@ Both services use Semantic Kernel with specialized agents operating in sequentia
 # Content generation (higher tokens)
 "CVAnalysisSkill": {"max_tokens": 10000}
 "SlideContentGenerator": {"max_tokens": 16000}
+```
+
+**PowerPoint v2 Service (Node.js):**
+```javascript
+// Conversation management (high tokens for context)
+"ConversationManager": {"max_tokens": 20000}
+
+// Content processing (medium tokens)
+"DocumentProcessor": {"max_tokens": 8000}
+"SlideEstimator": {"max_tokens": 4000}
+
+// Content generation (higher tokens)
+"ContentStructurer": {"max_tokens": 12000}
+"PptxGenerator": {"max_tokens": 10000}
 ```
 
 ### Temperature Settings by Purpose
@@ -169,6 +207,94 @@ Both services use Semantic Kernel with specialized agents operating in sequentia
 - **File encoding**: Documents must be properly base64 encoded for processing
 - **Service isolation**: Each service runs independently - choose the appropriate service for your testing needs
 
+## PowerPoint v2 Clarification Questions Workflow
+
+### Smart Question Generation (Max 5 Questions)
+
+The system generates contextual questions based on conversation analysis:
+
+**Always Included:**
+1. **Slide Count** - Number field with AI recommendation (5-50 range)
+2. **Audience Level** - Select: Beginner/Intermediate/Advanced/Mixed audience  
+3. **Include Examples** - Boolean for detailed examples and case studies
+
+**Context-Dependent Questions (2 additional):**
+- **Multi-topic Focus** - Select from detected topics (if multiple topics found)
+- **Content Style** - Adaptive based on content type:
+  - **Business Content**: Executive Summary/Strategic Overview/Training Material/Detailed Analysis
+  - **Technical Content**: High-level overview/Moderate detail/Deep technical dive/Implementation focused
+  - **General Content**: More visuals/Balanced/More text/Minimal design
+
+### Question Field Types
+- `number` - Numeric input with min/max validation
+- `select` - Dropdown with predefined options
+- `boolean` - True/false toggle for yes/no questions
+- `string` - Text input (when needed)
+
+### AI Slide Recommendation Logic
+The SlideEstimator analyzes conversation content to recommend optimal slide count:
+- **Content Length**: More extensive content requires more slides
+- **Topic Complexity**: Technical/business complexity adds slides
+- **Multiple Topics**: Each distinct topic needs coverage
+- **Content Type**: Business vs technical presentation requirements
+
+### Frontend Integration Example
+
+**Stage 1 Request:**
+```json
+{
+  "user_message": "[create_presentation]",
+  "conversation_history": [
+    {
+      "session_id": "abc-123",
+      "conversation": [
+        {
+          "question": "Tell me about robotics in workplace",
+          "response": "Robotics in workplace involves..."
+        }
+      ]
+    }
+  ],
+  "session_id": "abc-123",
+  "entra_id": "user-123"
+}
+```
+
+**Stage 1 Response:**
+```json
+{
+  "response_data": {
+    "show_clarification_popup": true,
+    "clarification_questions": [
+      {
+        "id": "slide_count",
+        "question": "How many slides would you like? (Recommended: 12 slides based on AI analysis)",
+        "field_type": "number",
+        "default_value": 12,
+        "validation": {"min": 5, "max": 50}
+      },
+      {
+        "id": "audience_level", 
+        "question": "What is the technical level of your audience?",
+        "field_type": "select",
+        "options": ["Beginner", "Intermediate", "Advanced", "Mixed audience"],
+        "default_value": "Intermediate"
+      }
+    ]
+  }
+}
+```
+
+**Stage 2 Request:**
+```json
+{
+  "user_message": "[clarification_answers]{\"slide_count\": 15, \"audience_level\": \"Advanced\", \"include_examples\": true, \"business_style\": \"Strategic Overview\"}",
+  "conversation_history": [same_as_stage_1],
+  "session_id": "abc-123",
+  "entra_id": "user-123"
+}
+```
+
 ## Performance Characteristics
 
 ### PDF Service Optimization
@@ -176,10 +302,17 @@ Both services use Semantic Kernel with specialized agents operating in sequentia
 - **Response time**: 25% faster (4-6s vs 6-8s previously)
 - **Clarification requests**: 85% reduction through smart defaults
 
-### PowerPoint Service Scaling
+### PowerPoint Service v1 Scaling
 - **Slide optimization**: Content-driven slide count (3-30 slides vs fixed 12)
 - **Processing time**: Consistent 12-15 seconds regardless of slide count
 - **Memory usage**: <500MB per request
+
+### PowerPoint Service v2 Performance
+- **Stage 1 (Questions)**: 2-3 seconds for AI slide recommendation + question generation
+- **Stage 2 (Generation)**: 6-9 seconds for customized presentation creation
+- **Total User Experience**: 8-12 seconds with interactive customization
+- **Memory Usage**: <400MB per request
+- **AI Efficiency**: Single SlideEstimator call in Stage 1, user choice respected in Stage 2
 
 ## Dependencies
 
@@ -203,7 +336,7 @@ python-pptx>=0.6.23     # PowerPoint service only
 
 **Node.js Service (PowerPoint v2):**
 - `@azure/functions` for Azure Functions runtime
-- `pptxgenjs` for PowerPoint generation (in development)
+- `pptxgenjs` for PowerPoint generation  
 - `openai` for OpenAI API integration
 - `dotenv` for environment variable management
 
@@ -256,18 +389,27 @@ Test scenarios include:
 - User instruction processing
 - Content-driven slide count optimization
 
-### PowerPoint Service v2 Testing (`azure_function_ppt_v2/test/test-poc.js`)
+### PowerPoint Service v2 Testing (`azure_function_ppt_v2/test/`)
 ```bash
 cd azure_function_ppt_v2
 npm start &  # Start service in background
-npm test  # Run conversational flow tests
+
+# Test 2-stage clarification workflow
+node test/test-clarification-workflow.js
+
+# Test legacy conversation workflow  
+node test/test-conversation-workflow.js
 ```
 
-Test scenarios include:
-- Document upload with clarifying questions
+**New Clarification Workflow Tests:**
+- Stage 1: AI slide recommendation and question generation
+- Stage 2: Customized presentation with user answers
+- Context-dependent question generation (business vs technical content)
+- Field type validation (number, select, boolean)
+
+**Legacy Tests:**
+- Basic conversation history processing
 - Multi-turn conversations for context building
-- Slide count estimation and user feedback
-- Presentation generation requests
 - Session and conversation history management
 
 ### Direct API Usage
@@ -292,17 +434,50 @@ All services accept POST requests with JSON payloads:
 ```
 
 **PowerPoint Service v2** (`/api/powerpointGeneration`):
+
+*Stage 1 - Get Clarification Questions:*
 ```json
 {
-  "user_message": "What kind of presentation works best? [document]base64_content",
+  "user_message": "[create_presentation]", 
   "entra_id": "user-id",
-  "session_id": "optional-session-id",
-  "conversation_history": []
+  "session_id": "session-id",
+  "conversation_history": [
+    {
+      "session_id": "session-id",
+      "conversation": [
+        {"question": "Tell me about robotics", "response": "Robotics involves..."}
+      ]
+    }
+  ]
+}
+```
+
+*Stage 2 - Generate with Answers:*
+```json
+{
+  "user_message": "[clarification_answers]{\"slide_count\": 15, \"audience_level\": \"Advanced\", \"include_examples\": true}",
+  "entra_id": "user-id", 
+  "session_id": "session-id",
+  "conversation_history": [same_as_stage_1]
 }
 ```
 
 ### Output Validation
 - Test scripts automatically validate JSON response structure
 - Base64 output can be decoded and saved as actual files for manual inspection
-- PowerPoint service saves files to `local_output/` directory automatically
+- PowerPoint services save files to `local_output/` directory automatically
 - PDF service test script includes comprehensive pipeline validation
+
+### PowerPoint v2 Test Script Details
+
+**test-clarification-workflow.js:**
+- Tests complete 2-stage workflow with robotics conversation example
+- Validates AI slide recommendation generation
+- Tests question field types (number, select, boolean)
+- Demonstrates context-dependent questions (business vs technical)
+- Includes business content detection test
+
+**test-conversation-workflow.js (Legacy):**
+- Tests basic conversation history processing
+- Validates session management
+- Demonstrates simple Q&A pair handling
