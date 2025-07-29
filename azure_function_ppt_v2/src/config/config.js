@@ -107,7 +107,7 @@ const QUICK_RESPONSE_PIPELINE = [
 
 const AGENT_CONFIGS = {
     ConversationManager: {
-        max_tokens: 3000,
+        max_tokens: 20000,
         temperature: 0.3,
         purpose: "Manage conversation flow, understand user intent, and maintain context"
     },

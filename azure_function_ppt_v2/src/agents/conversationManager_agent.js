@@ -42,14 +42,20 @@ class ConversationManager extends BaseAgent {
         if (documentInfo.has_document) {
             result.document_content = documentInfo.document_content;
             result.has_document_content = true;
+            result.content_source = result.content_source || 'document';
         } else {
             // Check if document content exists in conversation history
             const documentFromHistory = this.extractDocumentFromHistory(conversation_history);
             if (documentFromHistory) {
                 result.document_content = documentFromHistory;
                 result.has_document_content = true;
+                result.content_source = result.content_source || 'document';
             } else {
                 result.has_document_content = false;
+                // If no document but conversation_content exists, set content source
+                if (result.conversation_content && result.conversation_content.trim()) {
+                    result.content_source = result.content_source || 'conversation';
+                }
             }
         }
 
@@ -63,35 +69,49 @@ class ConversationManager extends BaseAgent {
 2. **Manage conversation flow** - Handle follow-up questions and clarifications
 3. **Detect generation requests** - Identify when user wants to create a presentation
 4. **Provide helpful responses** - Guide users through the process
+5. **Extract content from conversations** - Build presentation content from user messages
 
 ## User Intent Categories:
 - **CLARIFICATION**: User asking questions about their document or process
 - **CONTEXT_ADDITION**: User providing additional context or requirements
 - **GENERATION_REQUEST**: User explicitly requesting presentation creation
 - **GENERAL_INQUIRY**: General questions about the service
+- **CONTENT_BUILDING**: User providing topic details for presentation
 
-## Document Handling:
-- Documents are provided with [document] tags containing base64 or text content
-- Users may upload documents and then have conversations about them
-- Always acknowledge when a document is received
+## Content Sources:
+- **Documents**: Provided with [document_start] and [document_end] tags containing base64 or text content
+- **Conversation Content**: Topics, details, and requirements provided through conversation
+- **Mixed Approach**: Combination of documents and conversational context
+- **Document-Free**: Presentations built entirely from conversation content
 
 ## Generation Decision Logic:
 - Set "should_generate_presentation": true ONLY when:
   * User explicitly says "create presentation", "generate powerpoint", etc.
   * User says they're ready to proceed with generation
   * User confirms they want to create the presentation
+  * Sufficient content is available (either from document OR conversation)
 - Set "should_generate_presentation": false for:
-  * Questions about the document
+  * Questions about the document/topic
   * Requests for more information
   * General conversation
   * Adding context or clarifications
+  * Insufficient content for presentation
+
+## Content Extraction:
+When no document is provided, extract presentation content from:
+- User-specified topics and subtopics
+- Details provided in conversation
+- Requirements and preferences mentioned
+- Previous conversation context
 
 ## Response Format:
 Return JSON with:
 {
-    "intent": "CLARIFICATION|CONTEXT_ADDITION|GENERATION_REQUEST|GENERAL_INQUIRY",
+    "intent": "CLARIFICATION|CONTEXT_ADDITION|GENERATION_REQUEST|GENERAL_INQUIRY|CONTENT_BUILDING",
     "should_generate_presentation": boolean,
     "user_context": "summary of user's specific requirements or questions",
+    "conversation_content": "extracted content for presentation (when no document)",
+    "content_source": "document|conversation|mixed",
     "response_text": "your response to the user",
     "confidence": 0.0-1.0,
     "reasoning": "brief explanation of your decision"

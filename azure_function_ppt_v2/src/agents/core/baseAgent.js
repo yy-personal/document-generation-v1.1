@@ -120,13 +120,29 @@ class BaseAgent {
      * @returns {Object} Extracted document info
      */
     extractDocumentContent(userMessage) {
-        // Look for [document] tags
-        const documentMatch = userMessage.match(/\[document\](.+)/s);
+        // Look for [document_start] and [document_end] tags
+        const documentMatch = userMessage.match(/\[document_start\](.*?)\[document_end\]/s);
         
         if (documentMatch) {
+            const documentContent = documentMatch[1].trim();
+            const userText = userMessage
+                .replace(/\[document_start\].*?\[document_end\]/s, '')
+                .trim();
+            
             return {
                 has_document: true,
-                document_content: documentMatch[1].trim(),
+                document_content: documentContent,
+                user_text: userText
+            };
+        }
+
+        // Fallback: Look for legacy [document] tags for backward compatibility
+        const legacyDocumentMatch = userMessage.match(/\[document\](.+)/s);
+        
+        if (legacyDocumentMatch) {
+            return {
+                has_document: true,
+                document_content: legacyDocumentMatch[1].trim(),
                 user_text: userMessage.replace(/\[document\].+/s, '').trim()
             };
         }

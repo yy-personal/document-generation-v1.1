@@ -11,11 +11,11 @@ class SlideEstimator extends BaseAgent {
     }
 
     async process(input) {
-        // Can work with just document content or with processed content
-        const { document_content, processed_content, user_context } = input;
+        // Can work with document content, processed content, or conversation content
+        const { document_content, conversation_content, processed_content, user_context } = input;
 
-        if (!document_content && !processed_content) {
-            throw new Error('SlideEstimator requires either document_content or processed_content');
+        if (!document_content && !processed_content && !conversation_content) {
+            throw new Error('SlideEstimator requires document_content, processed_content, or conversation_content');
         }
 
         // Create system prompt for slide estimation
@@ -24,6 +24,7 @@ class SlideEstimator extends BaseAgent {
         // Create user prompt
         const userPrompt = this.createSlideEstimationUserPrompt({
             document_content,
+            conversation_content,
             processed_content,
             user_context
         });
@@ -95,7 +96,7 @@ Return JSON with:
 Be precise with slide estimation - users need accurate expectations.`;
     }
 
-    createSlideEstimationUserPrompt({ document_content, processed_content, user_context }) {
+    createSlideEstimationUserPrompt({ document_content, conversation_content, processed_content, user_context }) {
         let prompt = `## Slide Count Estimation Task:
 
 Analyze the content and estimate the optimal number of slides for a professional PowerPoint presentation.
@@ -107,6 +108,7 @@ Analyze the content and estimate the optimal number of slides for a professional
 
         if (processed_content) {
             prompt += `\n\n## Processed Content Analysis:
+Content Source: ${processed_content.content_source || 'document'}
 Document Type: ${processed_content.document_type}
 Content Complexity: ${processed_content.content_complexity}
 Main Topics Count: ${processed_content.main_topics?.length || 0}
@@ -127,6 +129,16 @@ Topics:`;
                     prompt += `\n- Procedures: ${processed_content.special_content.procedures.length}`;
                 }
             }
+        } else if (conversation_content) {
+            // Working with conversation content
+            const contentPreview = conversation_content.length > 1000 
+                ? conversation_content.substring(0, 1000) + '...' 
+                : conversation_content;
+            
+            prompt += `\n\n## Conversation Content:
+${contentPreview}
+
+Note: This is content extracted from user conversation, estimate slides based on topics and details provided.`;
         } else if (document_content) {
             // Working with raw document content
             const contentPreview = document_content.length > 1000 
@@ -148,6 +160,7 @@ ${user_context}`;
 3. Account for standard presentation structure (title, agenda, conclusion)
 4. Factor in special content types (tables, procedures, comparisons)
 5. Ensure slide count is within configured limits
+6. For conversation content: Estimate based on topic breadth and user requirements
 
 Provide a precise slide count estimate with clear reasoning.`;
 

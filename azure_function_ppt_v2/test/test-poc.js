@@ -130,6 +130,14 @@ We will measure success through:
         });
     }
 
+    generateSessionId() {
+        return `PPTV2-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    }
+
+    generateTestUserId() {
+        return `test-user-${Math.random().toString(36).substr(2, 6)}`;
+    }
+
     async testConversationalFlow() {
         console.log('Testing Conversational Flow...\n');
 
@@ -137,7 +145,7 @@ We will measure success through:
             // Test 1: Document upload with question
             console.log('Test 1: Document upload with clarifying question');
             const test1Request = {
-                user_message: `What kind of presentation would work best for this? [document]${this.testDocument}`,
+                user_message: `What kind of presentation would work best for this? [document_start]${this.testDocument}[document_end]`,
                 entra_id: 'test-user-1'
             };
 
@@ -199,6 +207,79 @@ We will measure success through:
         }
     }
 
+    async testConversationOnlyPresentation() {
+        console.log('Testing Conversation-Only Presentation Creation...\n');
+
+        const sessionId = this.generateSessionId();
+        const userId = this.generateTestUserId();
+
+        try {
+            // Step 1: Initial topic request
+            console.log('Step 1: User provides presentation topic');
+            const step1Response = await this.makeRequest({
+                user_message: "Create a presentation about artificial intelligence basics",
+                entra_id: userId,
+                session_id: sessionId,
+                conversation_history: []
+            }, 'Initial Topic Request');
+
+            console.log(`Status: ${step1Response.statusCode}`);
+            console.log(`Pipeline: ${step1Response.response_data?.pipeline_info?.join(' → ') || 'N/A'}`);
+            console.log(`Response: ${step1Response.response_data?.response_text?.substring(0, 150)}...`);
+            console.log(`Should Generate: ${step1Response.response_data?.processing_info?.conversation?.should_generate_presentation}`);
+
+            if (step1Response.statusCode !== 200) {
+                console.error('Step 1 failed');
+                return false;
+            }
+
+            // Step 2: Add more details
+            console.log('\nStep 2: User adds more context');
+            const step2Response = await this.makeRequest({
+                user_message: "Focus on machine learning, neural networks, and practical applications. Make it suitable for business executives who are new to AI.",
+                entra_id: userId,
+                session_id: sessionId,
+                conversation_history: step1Response.response_data.conversation_history
+            }, 'Context Addition');
+
+            console.log(`Status: ${step2Response.statusCode}`);
+            console.log(`Pipeline: ${step2Response.response_data?.pipeline_info?.join(' → ') || 'N/A'}`);
+            console.log(`Response: ${step2Response.response_data?.response_text?.substring(0, 150)}...`);
+            console.log(`Slide Estimate: ${step2Response.response_data?.processing_info?.slide_estimate?.estimated_slides || 'N/A'}`);
+
+            if (step2Response.statusCode !== 200) {
+                console.error('Step 2 failed');
+                return false;
+            }
+
+            // Step 3: Request presentation generation
+            console.log('\nStep 3: User requests presentation creation');
+            const step3Response = await this.makeRequest({
+                user_message: "That sounds good. Please create the presentation now.",
+                entra_id: userId,
+                session_id: sessionId,
+                conversation_history: step2Response.response_data.conversation_history
+            }, 'Generation Request');
+
+            console.log(`Status: ${step3Response.statusCode}`);
+            console.log(`Time: ${step3Response.processingTime?.toFixed(1)}s`);
+            console.log(`Pipeline: ${step3Response.response_data?.pipeline_info?.join(' → ') || 'N/A'}`);
+            
+            if (step3Response.response_data?.powerpoint_output) {
+                const pptx = step3Response.response_data.powerpoint_output;
+                console.log(`PowerPoint Generated: ${pptx.filename}`);
+                console.log(`Slides: ${step3Response.response_data?.processing_info?.slide_estimate?.estimated_slides || 'N/A'}`);
+                console.log(`File Size: ${Math.round(pptx.file_size_kb || 0)}KB`);
+            }
+
+            return step3Response.statusCode === 200 && step3Response.response_data?.powerpoint_output;
+
+        } catch (error) {
+            console.error('Conversation-only presentation test failed:', error.message);
+            return false;
+        }
+    }
+
     async testServiceStatus() {
         console.log('Testing Service Status...\n');
 
@@ -237,7 +318,8 @@ We will measure success through:
         // Run tests
         const tests = [
             { name: 'Service Status', fn: () => this.testServiceStatus() },
-            { name: 'Conversational Flow', fn: () => this.testConversationalFlow() }
+            { name: 'Conversational Flow', fn: () => this.testConversationalFlow() },
+            { name: 'Conversation-Only Presentation', fn: () => this.testConversationOnlyPresentation() }
         ];
 
         const results = [];

@@ -78,17 +78,28 @@ class PowerPointOrchestrator {
             // Determine if this is a generation request or just conversation
             const shouldGeneratePresentation = conversationResult.should_generate_presentation;
             const hasDocumentContent = conversationResult.has_document_content;
+            const hasConversationContent = conversationResult.conversation_content && conversationResult.conversation_content.trim();
+            const contentSource = conversationResult.content_source || 'unknown';
 
             if (!shouldGeneratePresentation) {
                 // Quick response - just conversation management and slide estimation
                 console.log('Quick response mode - no presentation generation requested');
                 
-                if (hasDocumentContent) {
-                    // Provide slide estimate if document is present
-                    const slideEstimate = await this.agents.SlideEstimator.process({
-                        document_content: conversationResult.document_content,
-                        user_context: conversationResult.user_context
-                    });
+                if (hasDocumentContent || hasConversationContent) {
+                    // Provide slide estimate if content is available
+                    const slideEstimateInput = {};
+                    
+                    if (hasDocumentContent) {
+                        slideEstimateInput.document_content = conversationResult.document_content;
+                    }
+                    
+                    if (hasConversationContent) {
+                        slideEstimateInput.conversation_content = conversationResult.conversation_content;
+                    }
+                    
+                    slideEstimateInput.user_context = conversationResult.user_context;
+
+                    const slideEstimate = await this.agents.SlideEstimator.process(slideEstimateInput);
                     
                     response.response_data.pipeline_info.push('SlideEstimator');
                     response.response_data.processing_info.slide_estimate = slideEstimate;
@@ -112,27 +123,46 @@ class PowerPointOrchestrator {
             // Full pipeline - generate presentation
             console.log('Full pipeline mode - generating presentation');
 
-            if (!hasDocumentContent) {
-                throw new Error('Cannot generate presentation without document content');
+            if (!hasDocumentContent && !hasConversationContent) {
+                throw new Error('Cannot generate presentation without document content or conversation content');
             }
 
-            // Step 2: Document Processing
-            console.log('Step 2: Processing document content');
-            const documentResult = await this.agents.DocumentProcessor.process({
-                document_content: conversationResult.document_content,
-                user_context: conversationResult.user_context
-            });
+            // Step 2: Content Processing
+            console.log('Step 2: Processing content');
+            const processingInput = {
+                user_context: conversationResult.user_context,
+                content_source: contentSource
+            };
+
+            if (hasDocumentContent) {
+                processingInput.document_content = conversationResult.document_content;
+            }
+
+            if (hasConversationContent) {
+                processingInput.conversation_content = conversationResult.conversation_content;
+            }
+
+            const documentResult = await this.agents.DocumentProcessor.process(processingInput);
 
             response.response_data.pipeline_info.push('DocumentProcessor');
             response.response_data.processing_info.document_analysis = documentResult;
 
             // Step 3: Slide Estimation
             console.log('Step 3: Estimating slide count');
-            const slideEstimate = await this.agents.SlideEstimator.process({
-                document_content: conversationResult.document_content,
+            const slideEstimateInput = {
                 processed_content: documentResult,
                 user_context: conversationResult.user_context
-            });
+            };
+
+            if (hasDocumentContent) {
+                slideEstimateInput.document_content = conversationResult.document_content;
+            }
+
+            if (hasConversationContent) {
+                slideEstimateInput.conversation_content = conversationResult.conversation_content;
+            }
+
+            const slideEstimate = await this.agents.SlideEstimator.process(slideEstimateInput);
 
             response.response_data.pipeline_info.push('SlideEstimator');
             response.response_data.processing_info.slide_estimate = slideEstimate;
