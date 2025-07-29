@@ -79,15 +79,62 @@ class PowerPointOrchestrator {
             const shouldGeneratePresentation = conversationResult.should_generate_presentation;
             const showSlideRecommendation = conversationResult.show_slide_recommendation;
             const showClarificationQuestions = conversationResult.show_clarification_questions;
+            const needSlideEstimation = conversationResult.need_slide_estimation;
             const clarificationAnswers = conversationResult.clarification_answers;
             const hasDocumentContent = conversationResult.has_document_content;
             const hasConversationContent = conversationResult.conversation_content && conversationResult.conversation_content.trim();
             const contentSource = conversationResult.content_source || 'unknown';
             const requestedSlideCount = conversationResult.requested_slide_count;
 
-            if (showClarificationQuestions) {
-                // Stage 1: Show clarification questions (frontend will show popup)
-                console.log('Stage 1: Providing clarification questions for popup');
+            if (showClarificationQuestions && needSlideEstimation) {
+                // Stage 1: Get AI slide recommendation, then generate clarification questions
+                console.log('Stage 1: Getting AI slide recommendation for clarification questions');
+                
+                if (!hasDocumentContent && !hasConversationContent) {
+                    throw new Error('Cannot generate slide recommendation without content');
+                }
+
+                // Call SlideEstimator for AI recommendation
+                const slideEstimateInput = {};
+                
+                if (hasDocumentContent) {
+                    slideEstimateInput.document_content = conversationResult.document_content;
+                }
+                
+                if (hasConversationContent) {
+                    slideEstimateInput.conversation_content = conversationResult.conversation_content;
+                }
+                
+                slideEstimateInput.user_context = conversationResult.user_context;
+
+                const slideEstimateResult = await this.agents.SlideEstimator.process(slideEstimateInput);
+                
+                // Generate clarification questions with AI recommendation
+                const clarificationQuestions = this.agents.ConversationManager.generateClarificationQuestions(
+                    conversation_history, 
+                    slideEstimateResult.estimated_slides
+                );
+
+                response.response_data.pipeline_info.push('SlideEstimator');
+                response.response_data.processing_info.slide_estimate = slideEstimateResult;
+                response.response_data.show_clarification_popup = true;
+                response.response_data.clarification_questions = clarificationQuestions;
+                response.response_data.response_text = "Please answer these questions to customize your presentation:";
+                
+                // Add assistant response to history
+                updatedHistory.push({
+                    role: 'assistant',
+                    content: response.response_data.response_text,
+                    timestamp: new Date().toISOString()
+                });
+
+                response.response_data.conversation_history = updatedHistory;
+                response.response_data.status = 'completed';
+                return response;
+                
+            } else if (showClarificationQuestions) {
+                // Legacy: Direct clarification questions (shouldn't happen with new flow)
+                console.log('Stage 1: Direct clarification questions (legacy)');
                 
                 response.response_data.show_clarification_popup = true;
                 response.response_data.clarification_questions = conversationResult.clarification_questions;
@@ -180,29 +227,45 @@ class PowerPointOrchestrator {
                 response.response_data.pipeline_info.push('DocumentProcessor');
                 response.response_data.processing_info.document_analysis = documentResult;
 
-                // Step 3: Slide Estimation
-                console.log('Step 3: Estimating slide count');
-                const slideEstimateInput = {
-                    processed_content: documentResult,
-                    user_context: conversationResult.user_context
-                };
+                // Step 3: Slide Estimation (or use user's choice)
+                let slideEstimate;
+                
+                if (clarificationAnswers && clarificationAnswers.slide_count) {
+                    // User provided slide count - skip AI estimation and use their choice
+                    console.log(`Step 3: Using user-specified slide count: ${clarificationAnswers.slide_count}`);
+                    slideEstimate = {
+                        estimated_slides: parseInt(clarificationAnswers.slide_count),
+                        content_complexity: "user_specified",
+                        reasoning: `User chose ${clarificationAnswers.slide_count} slides from clarification popup`,
+                        confidence: 1.0,
+                        user_specified: true
+                    };
+                    response.response_data.pipeline_info.push('SlideEstimator (user choice)');
+                } else {
+                    // No user choice - use AI estimation
+                    console.log('Step 3: Estimating slide count with AI');
+                    const slideEstimateInput = {
+                        processed_content: documentResult,
+                        user_context: conversationResult.user_context
+                    };
 
-                if (hasDocumentContent) {
-                    slideEstimateInput.document_content = conversationResult.document_content;
+                    if (hasDocumentContent) {
+                        slideEstimateInput.document_content = conversationResult.document_content;
+                    }
+
+                    if (hasConversationContent) {
+                        slideEstimateInput.conversation_content = conversationResult.conversation_content;
+                    }
+
+                    // Pass requested slide count if specified by user (legacy)
+                    if (requestedSlideCount) {
+                        slideEstimateInput.requested_slide_count = requestedSlideCount;
+                    }
+
+                    slideEstimate = await this.agents.SlideEstimator.process(slideEstimateInput);
+                    response.response_data.pipeline_info.push('SlideEstimator');
                 }
 
-                if (hasConversationContent) {
-                    slideEstimateInput.conversation_content = conversationResult.conversation_content;
-                }
-
-                // Pass requested slide count if specified by user
-                if (requestedSlideCount) {
-                    slideEstimateInput.requested_slide_count = requestedSlideCount;
-                }
-
-                const slideEstimate = await this.agents.SlideEstimator.process(slideEstimateInput);
-
-                response.response_data.pipeline_info.push('SlideEstimator');
                 response.response_data.processing_info.slide_estimate = slideEstimate;
 
                 // Step 4: Content Structuring

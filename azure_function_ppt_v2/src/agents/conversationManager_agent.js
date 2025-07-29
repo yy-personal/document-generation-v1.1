@@ -14,18 +14,12 @@ class ConversationManager extends BaseAgent {
 
         const { user_message, session_id, conversation_history = [], entra_id } = input;
 
-        console.log('[ConversationManager] Processing user_message:', JSON.stringify(user_message));
-
         // Check for exact bracket triggers first
         const bracketTrigger = this.detectBracketTriggers(user_message);
-        console.log('[ConversationManager] Bracket trigger detected:', bracketTrigger);
         
         if (bracketTrigger) {
-            console.log('[ConversationManager] Using bracket trigger handler');
             return this.handleBracketTrigger(bracketTrigger, input);
         }
-
-        console.log('[ConversationManager] No bracket trigger found, proceeding with AI processing');
 
         // Extract document content if present
         const documentInfo = this.extractDocumentContent(user_message);
@@ -270,20 +264,18 @@ Provide a helpful response and indicate whether presentation generation should p
         const { conversation_history = [] } = input;
 
         if (trigger.type === 'create_presentation') {
-            // Stage 1: Generate clarification questions for popup
-            const clarificationQuestions = this.generateClarificationQuestions(conversation_history);
-            
+            // Stage 1: Need AI slide estimation first, then generate questions
             return {
                 intent: "PRESENTATION_INITIATE",
                 should_generate_presentation: false,
                 show_clarification_questions: true,
-                clarification_questions: clarificationQuestions,
+                need_slide_estimation: true, // Flag to call SlideEstimator first
                 user_context: "User clicked Create Presentation button",
                 conversation_content: this.extractConversationContent(conversation_history),
                 content_source: "conversation",
-                response_text: "Please answer these questions to customize your presentation:",
+                response_text: "Analyzing your content to recommend optimal slide count...",
                 confidence: 1.0,
-                reasoning: "Frontend create presentation button triggered - showing clarification questions",
+                reasoning: "Frontend create presentation button triggered - need AI slide estimation",
                 requested_slide_count: null,
                 has_document_content: false
             };
@@ -349,25 +341,33 @@ Provide a helpful response and indicate whether presentation generation should p
     /**
      * Generate up to 5 clarification questions for PowerPoint customization
      * @param {Array} conversationHistory - Array of conversation messages
+     * @param {number} aiRecommendedSlides - AI-recommended slide count from SlideEstimator
      * @returns {Array} Array of question objects with field types
      */
-    generateClarificationQuestions(conversationHistory) {
+    generateClarificationQuestions(conversationHistory, aiRecommendedSlides = null) {
         // Analyze conversation to determine relevant questions
         const conversationContent = this.extractConversationContent(conversationHistory);
         const hasMultipleTopics = this.detectMultipleTopics(conversationHistory);
         const topics = this.extractTopics(conversationHistory);
 
+        // Use AI recommendation if provided, otherwise fallback to simple calculation
+        const recommendedSlides = aiRecommendedSlides || this.calculateRecommendedSlides(conversationContent, hasMultipleTopics);
+        const recommendationSource = aiRecommendedSlides ? "AI analysis of your content" : "content analysis";
+
         const questions = [];
 
-        // Question 1: Slide count (always included)
+        // Question 1: Slide count with AI recommendation (always included)
         questions.push({
             id: "slide_count",
-            question: "How many slides would you like in your presentation?",
+            question: `How many slides would you like in your presentation? (Recommended: ${recommendedSlides} slides based on ${recommendationSource})`,
             field_type: "number",
-            placeholder: "12",
+            placeholder: recommendedSlides.toString(),
             required: true,
-            default_value: 12,
-            validation: { min: 5, max: 50 }
+            default_value: recommendedSlides,
+            validation: { min: 5, max: 50 },
+            recommendation: recommendedSlides,
+            recommendation_source: recommendationSource,
+            ai_generated: !!aiRecommendedSlides
         });
 
         // Question 2: Presentation focus (if multiple topics detected)
@@ -484,6 +484,84 @@ Provide a helpful response and indicate whether presentation generation should p
         const technicalKeywords = ['technology', 'technical', 'implementation', 'system', 'software', 'hardware', 'algorithm', 'programming'];
         const lowerContent = content.toLowerCase();
         return technicalKeywords.some(keyword => lowerContent.includes(keyword));
+    }
+
+    /**
+     * Calculate recommended slide count based on content analysis
+     * @param {string} content - Conversation content
+     * @param {boolean} hasMultipleTopics - Whether multiple topics detected
+     * @returns {number} Recommended slide count
+     */
+    calculateRecommendedSlides(content, hasMultipleTopics) {
+        // Base slide calculation
+        let recommendedSlides = 8; // Base minimum
+
+        // Factor 1: Content length
+        const contentLength = content.length;
+        if (contentLength > 3000) {
+            recommendedSlides += 6; // 14 slides for long content
+        } else if (contentLength > 1500) {
+            recommendedSlides += 4; // 12 slides for medium content
+        } else {
+            recommendedSlides += 2; // 10 slides for short content
+        }
+
+        // Factor 2: Multiple topics
+        if (hasMultipleTopics) {
+            recommendedSlides += 3; // Additional slides for topic coverage
+        }
+
+        // Factor 3: Content complexity
+        const complexityWords = ['analysis', 'implementation', 'strategy', 'process', 'system', 'framework', 'methodology'];
+        const complexityCount = complexityWords.filter(word => 
+            content.toLowerCase().includes(word)
+        ).length;
+        
+        if (complexityCount >= 3) {
+            recommendedSlides += 2; // More slides for complex topics
+        }
+
+        // Factor 4: Business vs Technical content
+        if (this.isBusinessContent(content)) {
+            recommendedSlides += 1; // Business presentations often need more context
+        }
+
+        // Ensure within bounds
+        return Math.max(8, Math.min(20, recommendedSlides)); // 8-20 range for recommendations
+    }
+
+    /**
+     * Get explanation for slide recommendation
+     * @param {string} content - Conversation content
+     * @param {number} recommendedSlides - Recommended slide count
+     * @returns {string} Explanation for the recommendation
+     */
+    getSlideRecommendationReason(content, recommendedSlides) {
+        const contentLength = content.length;
+        const reasons = [];
+
+        if (contentLength > 3000) {
+            reasons.push("extensive content coverage");
+        } else if (contentLength > 1500) {
+            reasons.push("moderate content depth");
+        } else {
+            reasons.push("focused content");
+        }
+
+        if (this.isBusinessContent(content)) {
+            reasons.push("business context requirements");
+        } else if (this.isTechnicalContent(content)) {
+            reasons.push("technical detail needs");
+        }
+
+        const hasComplexity = ['analysis', 'implementation', 'strategy'].some(word => 
+            content.toLowerCase().includes(word)
+        );
+        if (hasComplexity) {
+            reasons.push("topic complexity");
+        }
+
+        return `Based on ${reasons.join(', ')}`;
     }
 }
 
