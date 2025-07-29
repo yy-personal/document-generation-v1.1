@@ -1,10 +1,7 @@
 /**
- * Test script for conversation history workflow
- * Tests the new use case where:
- * 1. User has chat conversation history
- * 2. User clicks "Create PowerPoint" button
- * 3. Popup asks for slide count
- * 4. System generates presentation from conversation content
+ * Test script for 2-stage conversation workflow
+ * Stage 1: User clicks "Create Presentation" → Get slide recommendation
+ * Stage 2: User confirms slide count → Generate PowerPoint
  */
 
 const fs = require('fs');
@@ -39,29 +36,24 @@ const conversationHistoryExample = {
   ]
 };
 
-async function testConversationWorkflow() {
-    console.log('Testing conversation history workflow...\n');
-
+async function testStage1_GetRecommendation() {
+    console.log('=== STAGE 1: Get Slide Recommendation ===');
+    
     const LOCAL_URL = 'http://localhost:7071/api/powerpointGeneration';
 
-    // Test case 1: User wants to create presentation with 15 slides
-    const testRequest = {
-        user_message: "Create PowerPoint presentation with 15 slides",
+    const stage1Request = {
+        user_message: "[create_presentation]",
         entra_id: "test-user-123",
         session_id: conversationHistoryExample.session_id,
         conversation_history: [conversationHistoryExample]
     };
 
     try {
-        console.log('Sending request to PowerPoint service...');
-        console.log('Request payload:', JSON.stringify(testRequest, null, 2));
-
+        console.log('Sending Stage 1 request...');
         const response = await fetch(LOCAL_URL, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(testRequest)
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(stage1Request)
         });
 
         if (!response.ok) {
@@ -69,41 +61,94 @@ async function testConversationWorkflow() {
         }
 
         const result = await response.json();
-        console.log('\n=== Response received ===');
+        
+        console.log('Status:', result.response_data.status);
+        console.log('Show popup:', result.response_data.show_slide_popup);
+        console.log('Recommended slides:', result.response_data.recommended_slides);
+        console.log('Response:', result.response_data.response_text);
+        
+        return result.response_data.recommended_slides;
+
+    } catch (error) {
+        console.error('Stage 1 failed:', error.message);
+        throw error;
+    }
+}
+
+async function testStage2_GeneratePresentation(recommendedSlides) {
+    console.log('\n=== STAGE 2: Generate Presentation ===');
+    
+    const LOCAL_URL = 'http://localhost:7071/api/powerpointGeneration';
+    const userSlideChoice = 12; // User chose 12 slides from popup
+
+    const stage2Request = {
+        user_message: `[slide_number_input]${userSlideChoice}`,
+        entra_id: "test-user-123",
+        session_id: conversationHistoryExample.session_id,
+        conversation_history: [conversationHistoryExample]
+    };
+
+    try {
+        console.log(`User chose ${userSlideChoice} slides (recommended was ${recommendedSlides})`);
+        console.log('Sending Stage 2 request...');
+        
+        const response = await fetch(LOCAL_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(stage2Request)
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        
         console.log('Status:', result.response_data.status);
         console.log('Pipeline used:', result.response_data.pipeline_info);
         
-        if (result.response_data.processing_info.slide_estimate) {
-            console.log('Slide estimate:', result.response_data.processing_info.slide_estimate.estimated_slides);
-            console.log('User specified:', result.response_data.processing_info.slide_estimate.user_specified);
-        }
-
         if (result.response_data.powerpoint_output) {
-            console.log('PowerPoint generated!');
+            console.log('✅ PowerPoint Generated!');
             console.log('Filename:', result.response_data.powerpoint_output.filename);
             console.log('File size:', result.response_data.powerpoint_output.file_size_kb, 'KB');
+            console.log('Actual slides created:', result.response_data.processing_info.slide_estimate.estimated_slides);
         }
 
-        console.log('\nResponse text:', result.response_data.response_text);
-
+        console.log('Final response:', result.response_data.response_text);
         return result;
 
     } catch (error) {
-        console.error('Test failed:', error.message);
+        console.error('Stage 2 failed:', error.message);
         throw error;
+    }
+}
+
+async function testFullWorkflow() {
+    console.log('Testing 2-stage conversation workflow...\n');
+    
+    try {
+        // Stage 1: Get recommendation
+        const recommendedSlides = await testStage1_GetRecommendation();
+        
+        // Stage 2: Generate with user choice  
+        await testStage2_GeneratePresentation(recommendedSlides);
+        
+        console.log('\n✅ 2-stage workflow completed successfully!');
+        
+    } catch (error) {
+        console.error('\n❌ Workflow failed:', error);
+        process.exit(1);
     }
 }
 
 // Run the test if this file is executed directly
 if (require.main === module) {
-    testConversationWorkflow()
-        .then(() => {
-            console.log('\n✅ Conversation workflow test completed successfully');
-        })
-        .catch((error) => {
-            console.error('\n❌ Test failed:', error);
-            process.exit(1);
-        });
+    testFullWorkflow();
 }
 
-module.exports = { testConversationWorkflow, conversationHistoryExample };
+module.exports = { 
+    testStage1_GetRecommendation, 
+    testStage2_GeneratePresentation, 
+    testFullWorkflow, 
+    conversationHistoryExample 
+};

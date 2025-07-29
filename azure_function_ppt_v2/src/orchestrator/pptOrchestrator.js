@@ -75,19 +75,40 @@ class PowerPointOrchestrator {
                 timestamp: new Date().toISOString()
             }];
 
-            // Determine if this is a generation request or just conversation
+            // Determine workflow stage
             const shouldGeneratePresentation = conversationResult.should_generate_presentation;
+            const showSlideRecommendation = conversationResult.show_slide_recommendation;
+            const showClarificationQuestions = conversationResult.show_clarification_questions;
+            const clarificationAnswers = conversationResult.clarification_answers;
             const hasDocumentContent = conversationResult.has_document_content;
             const hasConversationContent = conversationResult.conversation_content && conversationResult.conversation_content.trim();
             const contentSource = conversationResult.content_source || 'unknown';
             const requestedSlideCount = conversationResult.requested_slide_count;
 
-            if (!shouldGeneratePresentation) {
-                // Quick response - just conversation management and slide estimation
-                console.log('Quick response mode - no presentation generation requested');
+            if (showClarificationQuestions) {
+                // Stage 1: Show clarification questions (frontend will show popup)
+                console.log('Stage 1: Providing clarification questions for popup');
+                
+                response.response_data.show_clarification_popup = true;
+                response.response_data.clarification_questions = conversationResult.clarification_questions;
+                response.response_data.response_text = conversationResult.response_text;
+                
+                // Add assistant response to history
+                updatedHistory.push({
+                    role: 'assistant',
+                    content: conversationResult.response_text,
+                    timestamp: new Date().toISOString()
+                });
+
+                response.response_data.conversation_history = updatedHistory;
+                response.response_data.status = 'completed';
+                return response;
+                
+            } else if (showSlideRecommendation) {
+                // Legacy: Show slide recommendation (frontend will show popup)
+                console.log('Stage 1: Providing slide recommendation for popup');
                 
                 if (hasDocumentContent || hasConversationContent) {
-                    // Provide slide estimate if content is available
                     const slideEstimateInput = {};
                     
                     if (hasDocumentContent) {
@@ -104,10 +125,16 @@ class PowerPointOrchestrator {
                     
                     response.response_data.pipeline_info.push('SlideEstimator');
                     response.response_data.processing_info.slide_estimate = slideEstimate;
-                    response.response_data.response_text = this.formatConversationResponse(conversationResult, slideEstimate);
+                    response.response_data.show_slide_popup = true;
+                    response.response_data.recommended_slides = slideEstimate.estimated_slides;
+                    response.response_data.response_text = `Ready to create presentation! I recommend ${slideEstimate.estimated_slides} slides based on your conversation content.`;
                 } else {
-                    response.response_data.response_text = conversationResult.response_text;
+                    throw new Error('Cannot recommend slides without content');
                 }
+            } else if (!shouldGeneratePresentation) {
+                // Regular conversation - no presentation workflow
+                console.log('Regular conversation mode');
+                response.response_data.response_text = conversationResult.response_text;
 
                 // Add assistant response to history
                 updatedHistory.push({
@@ -119,98 +146,111 @@ class PowerPointOrchestrator {
                 response.response_data.conversation_history = updatedHistory;
                 response.response_data.status = 'completed';
                 return response;
+            } else {
+                // Stage 2: Generate presentation with confirmed slide count
+                console.log('Stage 2: Generating presentation with user-confirmed slide count');
+
+                if (!hasDocumentContent && !hasConversationContent) {
+                    throw new Error('Cannot generate presentation without document content or conversation content');
+                }
+
+                // Step 2: Content Processing
+                console.log('Step 2: Processing content');
+                const processingInput = {
+                    user_context: conversationResult.user_context,
+                    content_source: contentSource
+                };
+
+                // Add clarification answers if provided
+                if (clarificationAnswers) {
+                    processingInput.clarification_answers = clarificationAnswers;
+                    console.log('Using clarification answers for content processing');
+                }
+
+                if (hasDocumentContent) {
+                    processingInput.document_content = conversationResult.document_content;
+                }
+
+                if (hasConversationContent) {
+                    processingInput.conversation_content = conversationResult.conversation_content;
+                }
+
+                const documentResult = await this.agents.DocumentProcessor.process(processingInput);
+
+                response.response_data.pipeline_info.push('DocumentProcessor');
+                response.response_data.processing_info.document_analysis = documentResult;
+
+                // Step 3: Slide Estimation
+                console.log('Step 3: Estimating slide count');
+                const slideEstimateInput = {
+                    processed_content: documentResult,
+                    user_context: conversationResult.user_context
+                };
+
+                if (hasDocumentContent) {
+                    slideEstimateInput.document_content = conversationResult.document_content;
+                }
+
+                if (hasConversationContent) {
+                    slideEstimateInput.conversation_content = conversationResult.conversation_content;
+                }
+
+                // Pass requested slide count if specified by user
+                if (requestedSlideCount) {
+                    slideEstimateInput.requested_slide_count = requestedSlideCount;
+                }
+
+                const slideEstimate = await this.agents.SlideEstimator.process(slideEstimateInput);
+
+                response.response_data.pipeline_info.push('SlideEstimator');
+                response.response_data.processing_info.slide_estimate = slideEstimate;
+
+                // Step 4: Content Structuring
+                console.log('Step 4: Structuring content for slides');
+                const structuringInput = {
+                    processed_content: documentResult,
+                    slide_estimate: slideEstimate,
+                    user_context: conversationResult.user_context
+                };
+
+                // Add clarification answers for content structuring
+                if (clarificationAnswers) {
+                    structuringInput.clarification_answers = clarificationAnswers;
+                }
+
+                const structuredContent = await this.agents.ContentStructurer.process(structuringInput);
+
+                response.response_data.pipeline_info.push('ContentStructurer');
+                response.response_data.processing_info.content_structure = structuredContent;
+
+                // Step 5: PowerPoint Generation
+                console.log('Step 5: Generating PowerPoint file');
+                const pptxResult = await this.agents.PptxGenerator.process({
+                    structured_content: structuredContent,
+                    slide_estimate: slideEstimate,
+                    session_id: sessionId
+                });
+
+                response.response_data.pipeline_info.push('PptxGenerator');
+                response.response_data.powerpoint_output = pptxResult;
+
+                // Prepare final response
+                response.response_data.response_text = this.formatGenerationResponse(slideEstimate, pptxResult);
+
+                // Add assistant response to history
+                updatedHistory.push({
+                    role: 'assistant',
+                    content: response.response_data.response_text,
+                    timestamp: new Date().toISOString(),
+                    powerpoint_generated: true
+                });
+
+                response.response_data.conversation_history = updatedHistory;
+                response.response_data.status = 'completed';
+
+                console.log('PowerPoint generation completed successfully');
+                return response;
             }
-
-            // Full pipeline - generate presentation
-            console.log('Full pipeline mode - generating presentation');
-
-            if (!hasDocumentContent && !hasConversationContent) {
-                throw new Error('Cannot generate presentation without document content or conversation content');
-            }
-
-            // Step 2: Content Processing
-            console.log('Step 2: Processing content');
-            const processingInput = {
-                user_context: conversationResult.user_context,
-                content_source: contentSource
-            };
-
-            if (hasDocumentContent) {
-                processingInput.document_content = conversationResult.document_content;
-            }
-
-            if (hasConversationContent) {
-                processingInput.conversation_content = conversationResult.conversation_content;
-            }
-
-            const documentResult = await this.agents.DocumentProcessor.process(processingInput);
-
-            response.response_data.pipeline_info.push('DocumentProcessor');
-            response.response_data.processing_info.document_analysis = documentResult;
-
-            // Step 3: Slide Estimation
-            console.log('Step 3: Estimating slide count');
-            const slideEstimateInput = {
-                processed_content: documentResult,
-                user_context: conversationResult.user_context
-            };
-
-            if (hasDocumentContent) {
-                slideEstimateInput.document_content = conversationResult.document_content;
-            }
-
-            if (hasConversationContent) {
-                slideEstimateInput.conversation_content = conversationResult.conversation_content;
-            }
-
-            // Pass requested slide count if specified by user
-            if (requestedSlideCount) {
-                slideEstimateInput.requested_slide_count = requestedSlideCount;
-            }
-
-            const slideEstimate = await this.agents.SlideEstimator.process(slideEstimateInput);
-
-            response.response_data.pipeline_info.push('SlideEstimator');
-            response.response_data.processing_info.slide_estimate = slideEstimate;
-
-            // Step 4: Content Structuring
-            console.log('Step 4: Structuring content for slides');
-            const structuredContent = await this.agents.ContentStructurer.process({
-                processed_content: documentResult,
-                slide_estimate: slideEstimate,
-                user_context: conversationResult.user_context
-            });
-
-            response.response_data.pipeline_info.push('ContentStructurer');
-            response.response_data.processing_info.content_structure = structuredContent;
-
-            // Step 5: PowerPoint Generation
-            console.log('Step 5: Generating PowerPoint file');
-            const pptxResult = await this.agents.PptxGenerator.process({
-                structured_content: structuredContent,
-                slide_estimate: slideEstimate,
-                session_id: sessionId
-            });
-
-            response.response_data.pipeline_info.push('PptxGenerator');
-            response.response_data.powerpoint_output = pptxResult;
-
-            // Prepare final response
-            response.response_data.response_text = this.formatGenerationResponse(slideEstimate, pptxResult);
-
-            // Add assistant response to history
-            updatedHistory.push({
-                role: 'assistant',
-                content: response.response_data.response_text,
-                timestamp: new Date().toISOString(),
-                powerpoint_generated: true
-            });
-
-            response.response_data.conversation_history = updatedHistory;
-            response.response_data.status = 'completed';
-
-            console.log('PowerPoint generation completed successfully');
-            return response;
 
         } catch (error) {
             console.error('Error in orchestrator:', error);
