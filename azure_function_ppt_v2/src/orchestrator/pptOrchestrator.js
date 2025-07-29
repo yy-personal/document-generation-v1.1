@@ -80,6 +80,7 @@ class PowerPointOrchestrator {
             const hasDocumentContent = conversationResult.has_document_content;
             const hasConversationContent = conversationResult.conversation_content && conversationResult.conversation_content.trim();
             const contentSource = conversationResult.content_source || 'unknown';
+            const requestedSlideCount = conversationResult.requested_slide_count;
 
             if (!shouldGeneratePresentation) {
                 // Quick response - just conversation management and slide estimation
@@ -160,6 +161,11 @@ class PowerPointOrchestrator {
 
             if (hasConversationContent) {
                 slideEstimateInput.conversation_content = conversationResult.conversation_content;
+            }
+
+            // Pass requested slide count if specified by user
+            if (requestedSlideCount) {
+                slideEstimateInput.requested_slide_count = requestedSlideCount;
             }
 
             const slideEstimate = await this.agents.SlideEstimator.process(slideEstimateInput);

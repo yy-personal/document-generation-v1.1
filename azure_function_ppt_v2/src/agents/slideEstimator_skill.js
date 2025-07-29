@@ -12,10 +12,26 @@ class SlideEstimator extends BaseAgent {
 
     async process(input) {
         // Can work with document content, processed content, or conversation content
-        const { document_content, conversation_content, processed_content, user_context } = input;
+        const { document_content, conversation_content, processed_content, user_context, requested_slide_count } = input;
 
         if (!document_content && !processed_content && !conversation_content) {
             throw new Error('SlideEstimator requires document_content, processed_content, or conversation_content');
+        }
+
+        // If user specified slide count, use it (with bounds checking)
+        if (requested_slide_count) {
+            const slideCount = Math.max(
+                PRESENTATION_CONFIG.min_slides,
+                Math.min(PRESENTATION_CONFIG.max_slides, parseInt(requested_slide_count))
+            );
+            
+            return {
+                estimated_slides: slideCount,
+                content_complexity: "user_specified",
+                reasoning: `User requested ${requested_slide_count} slides. Adjusted to ${slideCount} slides within system limits.`,
+                confidence: 1.0,
+                user_specified: true
+            };
         }
 
         // Create system prompt for slide estimation
@@ -44,6 +60,7 @@ class SlideEstimator extends BaseAgent {
             Math.min(PRESENTATION_CONFIG.max_slides, result.estimated_slides)
         );
 
+        result.user_specified = false;
         return result;
     }
 

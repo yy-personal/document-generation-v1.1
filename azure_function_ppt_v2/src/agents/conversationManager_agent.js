@@ -89,6 +89,7 @@ class ConversationManager extends BaseAgent {
   * User explicitly says "create presentation", "generate powerpoint", etc.
   * User says they're ready to proceed with generation
   * User confirms they want to create the presentation
+  * User provides slide count for presentation (e.g., "create 10 slides")
   * Sufficient content is available (either from document OR conversation)
 - Set "should_generate_presentation": false for:
   * Questions about the document/topic
@@ -96,6 +97,11 @@ class ConversationManager extends BaseAgent {
   * General conversation
   * Adding context or clarifications
   * Insufficient content for presentation
+
+## Slide Count Detection:
+- Extract specific slide count if mentioned (e.g., "10 slides", "create 15 slides")
+- Set "requested_slide_count" to the number if specified
+- Leave as null if no specific count mentioned
 
 ## Content Extraction:
 When no document is provided, extract presentation content from:
@@ -114,7 +120,8 @@ Return JSON with:
     "content_source": "document|conversation|mixed",
     "response_text": "your response to the user",
     "confidence": 0.0-1.0,
-    "reasoning": "brief explanation of your decision"
+    "reasoning": "brief explanation of your decision",
+    "requested_slide_count": "number if user specified slide count, null otherwise"
 }
 
 Be conversational, helpful, and guide users through the presentation creation process.`;
@@ -133,11 +140,24 @@ Session ID: ${session_id || 'New session'}`;
         if (conversation_history && conversation_history.length > 0) {
             prompt += `\n\n## Conversation History:`;
             
-            // Include last few messages for context
-            const recentHistory = conversation_history.slice(-6);
-            recentHistory.forEach((msg, index) => {
-                prompt += `\n${msg.role}: ${msg.content}`;
-            });
+            // Handle different conversation history formats
+            if (Array.isArray(conversation_history) && conversation_history.length > 0) {
+                // Check if it's the new format with conversation object
+                if (conversation_history[0].conversation) {
+                    // New format: extract Q&A pairs from conversation array
+                    const conversations = conversation_history[0].conversation;
+                    conversations.forEach((conv, index) => {
+                        prompt += `\nQuestion ${index + 1}: ${conv.question}`;
+                        prompt += `\nResponse ${index + 1}: ${conv.response}`;
+                    });
+                } else {
+                    // Standard format: include last few messages for context
+                    const recentHistory = conversation_history.slice(-6);
+                    recentHistory.forEach((msg, index) => {
+                        prompt += `\n${msg.role}: ${msg.content}`;
+                    });
+                }
+            }
         }
 
         if (has_document && document_content) {
