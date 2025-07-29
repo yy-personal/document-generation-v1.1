@@ -53,7 +53,7 @@ const SUPPORTED_OUTPUT_FORMATS = [
 // ====================================================================
 
 const PRESENTATION_CONFIG = {
-    max_slides: 30,        // Maximum allowed slides (hard limit)
+    max_slides: 50,        // Maximum allowed slides (hard limit)
     min_slides: 5,         // Minimum slides for proper presentation structure
     default_slides: 12,    // Default target when content complexity is medium
     use_case: "Conversational business presentations with PptxGenJS"
@@ -131,7 +131,7 @@ const AGENT_CONFIGS = {
     },
     
     PptxGenerator: {
-        max_tokens: 6000,
+        max_tokens: 10000,
         temperature: 0.2,
         purpose: "Generate PptxGenJS code for creating PowerPoint files"
     }
