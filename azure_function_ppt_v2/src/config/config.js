@@ -118,16 +118,10 @@ const AGENT_CONFIGS = {
         purpose: "Extract and organize content from documents for presentation structure"
     },
     
-    SlideEstimator: {
-        max_tokens: 4000,
-        temperature: 0.3,
-        purpose: "Analyze content complexity and estimate optimal slide count"
-    },
-    
     ClarificationQuestionGenerator: {
-        max_tokens: 6000,
+        max_tokens: 8000,
         temperature: 0.4,
-        purpose: "Generate contextual clarification questions based on conversation content"
+        purpose: "Analyze content complexity, estimate optimal slide count, and generate contextual clarification questions"
     },
     
     ContentStructurer: {

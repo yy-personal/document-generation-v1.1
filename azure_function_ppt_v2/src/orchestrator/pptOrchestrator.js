@@ -7,7 +7,6 @@ const {
 // Import agents with updated naming convention
 const { ConversationManager } = require('../agents/conversationManager_agent');
 const { DocumentProcessor } = require('../agents/documentProcessor_skill');
-const { SlideEstimator } = require('../agents/slideEstimator_skill');
 const { ClarificationQuestionGenerator } = require('../agents/clarificationQuestionGenerator_skill');
 const { ContentStructurer } = require('../agents/contentStructurer_skill');
 const { PptxGenerator } = require('../agents/pptxGenerator_skill');
@@ -17,7 +16,6 @@ class PowerPointOrchestrator {
         this.agents = {
             ConversationManager: new ConversationManager(),
             DocumentProcessor: new DocumentProcessor(),
-            SlideEstimator: new SlideEstimator(),
             ClarificationQuestionGenerator: new ClarificationQuestionGenerator(),
             ContentStructurer: new ContentStructurer(),
             PptxGenerator: new PptxGenerator()
@@ -96,33 +94,26 @@ class PowerPointOrchestrator {
                     throw new Error('Cannot generate slide recommendation without content');
                 }
 
-                // Call SlideEstimator for AI recommendation
-                const slideEstimateInput = {};
-                
-                if (hasDocumentContent) {
-                    slideEstimateInput.document_content = conversationResult.document_content;
-                }
-                
-                if (hasConversationContent) {
-                    slideEstimateInput.conversation_content = conversationResult.conversation_content;
-                }
-                
-                slideEstimateInput.user_context = conversationResult.user_context;
-
-                const slideEstimateResult = await this.agents.SlideEstimator.process(slideEstimateInput);
-                
-                // Generate contextual clarification questions using AI
+                // Generate slide estimation AND clarification questions in one AI call
                 const clarificationInput = {
                     conversation_content: conversationResult.conversation_content,
-                    aiRecommendedSlides: slideEstimateResult.estimated_slides,
-                    conversation_history: conversation_history
+                    conversation_history: conversation_history,
+                    requested_slide_count: conversationResult.requested_slide_count
                 };
                 
                 const clarificationResult = await this.agents.ClarificationQuestionGenerator.process(clarificationInput);
                 const clarificationQuestions = clarificationResult.questions;
 
-                response.response_data.pipeline_info.push('SlideEstimator', 'ClarificationQuestionGenerator');
-                response.response_data.processing_info.slide_estimate = slideEstimateResult;
+                response.response_data.pipeline_info.push('ClarificationQuestionGenerator');
+                response.response_data.processing_info.slide_estimate = {
+                    estimated_slides: clarificationResult.estimated_slides,
+                    content_complexity: clarificationResult.content_complexity,
+                    slide_breakdown: clarificationResult.slide_breakdown,
+                    complexity_factors: clarificationResult.complexity_factors,
+                    reasoning: clarificationResult.reasoning,
+                    confidence: clarificationResult.confidence,
+                    user_specified: clarificationResult.user_specified
+                };
                 response.response_data.processing_info.clarification_analysis = {
                     content_analysis: clarificationResult.content_analysis,
                     reasoning: clarificationResult.reasoning

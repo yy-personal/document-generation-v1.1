@@ -11,19 +11,38 @@ class ClarificationQuestionGenerator extends BaseAgent {
     }
 
     async process(input) {
-        const { conversation_content, aiRecommendedSlides, conversation_history } = input;
+        const { conversation_content, conversation_history, requested_slide_count } = input;
 
         if (!conversation_content) {
             throw new Error('ClarificationQuestionGenerator requires conversation_content');
         }
 
-        // Create system prompt for question generation
-        const systemPrompt = this.createQuestionGenerationSystemPrompt();
+        // If user specified slide count, use it (with bounds checking)
+        if (requested_slide_count) {
+            const slideCount = Math.max(
+                PRESENTATION_CONFIG.min_slides,
+                Math.min(PRESENTATION_CONFIG.max_slides, parseInt(requested_slide_count))
+            );
+            
+            const questions = this.addSlideCountQuestion([], slideCount, true);
+            
+            return {
+                estimated_slides: slideCount,
+                content_complexity: "user_specified",
+                reasoning: `User requested ${requested_slide_count} slides. Adjusted to ${slideCount} slides within system limits.`,
+                confidence: 1.0,
+                user_specified: true,
+                questions: questions,
+                content_analysis: "User-specified slide count"
+            };
+        }
+
+        // Create combined system prompt for slide estimation AND question generation
+        const systemPrompt = this.createCombinedSystemPrompt();
 
         // Create user prompt with content analysis
-        const userPrompt = this.createQuestionGenerationUserPrompt({
+        const userPrompt = this.createCombinedUserPrompt({
             conversation_content,
-            aiRecommendedSlides,
             conversation_history
         });
 
@@ -32,45 +51,89 @@ class ClarificationQuestionGenerator extends BaseAgent {
             this.createUserMessage(userPrompt)
         ];
 
-        // Call AI service
+        // Call AI service ONCE for both slide estimation and question generation
         const aiResponse = await this.callAI(messages);
         const result = this.parseAIResponse(aiResponse.content);
 
+        // Ensure slide count is within bounds
+        result.estimated_slides = Math.max(
+            PRESENTATION_CONFIG.min_slides,
+            Math.min(PRESENTATION_CONFIG.max_slides, result.estimated_slides)
+        );
+
         // Add slide count question with AI recommendation
-        const questions = this.addSlideCountQuestion(result.questions, aiRecommendedSlides);
+        const questions = this.addSlideCountQuestion(result.questions, result.estimated_slides);
 
         return {
+            estimated_slides: result.estimated_slides,
+            content_complexity: result.content_complexity,
+            slide_breakdown: result.slide_breakdown,
+            complexity_factors: result.complexity_factors,
+            reasoning: result.reasoning,
+            confidence: result.confidence || 0.8,
+            user_specified: false,
             questions: questions,
-            content_analysis: result.content_analysis,
-            reasoning: result.reasoning
+            content_analysis: result.content_analysis
         };
     }
 
-    createQuestionGenerationSystemPrompt() {
-        return `You are a ClarificationQuestionGenerator that creates contextual questions to customize PowerPoint presentations.
+    createCombinedSystemPrompt() {
+        return `You are a ClarificationQuestionGenerator that performs TWO tasks in one analysis:
+1. **Slide Count Estimation**: Determine optimal slide count based on content analysis
+2. **Question Generation**: Create contextual clarification questions for presentation customization
 
-## Core Requirements:
+## TASK 1: Slide Count Estimation
+
+### Slide Count Guidelines:
+- **Minimum**: ${PRESENTATION_CONFIG.min_slides} slides (for any presentation)
+- **Maximum**: ${PRESENTATION_CONFIG.max_slides} slides (hard limit)
+- **Default**: ${PRESENTATION_CONFIG.default_slides} slides (for medium complexity)
+
+### Estimation Factors:
+1. **Content Volume**: How much information needs to be presented
+2. **Topic Complexity**: How detailed each topic needs to be
+3. **Content Types**: Different content types require different slide counts
+4. **Presentation Flow**: Need for transitions, summaries, conclusions
+
+### Slide Allocation Strategy:
+- **Title Slide**: Always 1 slide
+- **Agenda/Overview**: 1-2 slides depending on complexity
+- **Main Content**: Based on topics and complexity
+- **Supporting Content**: Tables, procedures, detailed analysis
+- **Conclusion/Summary**: 1-2 slides
+- **Thank You/Next Steps**: 1 slide
+
+### Content Type Slide Requirements:
+- **Simple Topic**: 1 slide
+- **Complex Topic**: 2-3 slides
+- **Data/Table Content**: 1-2 slides per table
+- **Procedure/Process**: 1 slide per 3-5 steps
+- **Comparison**: 1-2 slides depending on items compared
+
+## TASK 2: Question Generation
+
+### Core Requirements:
 - Generate 3-4 contextual clarification questions (excluding slide count)
 - Questions must be either 'select' (dropdown) or 'boolean' (true/false) field types ONLY
 - NO number inputs, text inputs, or other field types allowed
 - Questions should be highly relevant to the conversation content
 - Provide 3-5 meaningful options for each 'select' question
 
-## Question Categories to Consider:
+### Question Categories to Consider:
 1. **Audience Level**: Technical expertise, business level, educational background
 2. **Content Focus**: Which aspects to emphasize from the conversation
 3. **Presentation Style**: Format, depth, visual approach
 4. **Content Inclusion**: Examples, case studies, detailed analysis
 5. **Contextual Preferences**: Based on detected content type (business/technical/educational)
 
-## Content Analysis Guidelines:
+### Content Analysis Guidelines:
 - **Business Content**: Focus on strategic level, audience role, implementation vs overview
 - **Technical Content**: Focus on technical depth, implementation detail, audience expertise
 - **Educational Content**: Focus on learning objectives, complexity level, practical examples
 - **Multi-topic Content**: Focus on primary emphasis, topic prioritization
 - **Process/Procedure Content**: Focus on detail level, step-by-step vs overview
 
-## Field Type Rules:
+### Field Type Rules:
 - **select**: Dropdown with 3-5 predefined options
 - **boolean**: True/false questions for yes/no preferences
 - Each question must have 'required: true'
@@ -80,61 +143,75 @@ class ClarificationQuestionGenerator extends BaseAgent {
 ## Output Format:
 Return JSON with:
 {
+    "estimated_slides": number,
+    "content_complexity": "low|medium|high",
+    "slide_breakdown": {
+        "title_slide": 1,
+        "agenda_slides": number,
+        "content_slides": number,
+        "conclusion_slides": number,
+        "total": number
+    },
+    "complexity_factors": ["factor1", "factor2", ...],
+    "reasoning": "explanation of slide count decision and question selection",
+    "confidence": number_between_0_and_1,
     "questions": [
         {
             "id": "unique_question_id",
             "question": "Clear question text with context",
             "field_type": "select" | "boolean",
-            "options": ["option1", "option2", "option3"] // for select only
+            "options": ["option1", "option2", "option3"], // for select only
             "required": true,
             "default_value": "default_option_or_boolean"
         }
     ],
-    "content_analysis": "Brief analysis of content type and detected themes",
-    "reasoning": "Why these specific questions were chosen for this content"
+    "content_analysis": "Brief analysis of content type and detected themes"
 }`;
     }
 
-    createQuestionGenerationUserPrompt({ conversation_content, aiRecommendedSlides, conversation_history }) {
-        return `Analyze this conversation content and generate 3-4 contextual clarification questions:
+    createCombinedUserPrompt({ conversation_content, conversation_history }) {
+        return `Analyze this conversation content and perform BOTH slide estimation AND question generation:
 
 ## Conversation Content:
 ${conversation_content}
 
 ## Context:
-- AI recommended slides: ${aiRecommendedSlides || 'Not provided'}
 - Content source: Conversation history with user
+- Task: Provide both optimal slide count and relevant clarification questions
 
 ## Your Task:
-1. Analyze the content type, themes, and complexity
-2. Identify what customization options would be most valuable
-3. Generate 3-4 highly relevant questions (select/boolean only)
+1. **Slide Estimation**: Analyze content complexity, volume, and structure to determine optimal slide count
+2. **Content Analysis**: Identify content type, themes, and complexity factors
+3. **Question Generation**: Generate 3-4 highly relevant questions (select/boolean only) based on the content analysis
 4. Ensure questions help customize the presentation for maximum value
 
-## Examples of Good Questions:
+## Examples of Analysis:
 
 **For Business Content:**
-- "What's your primary audience role?" (select: ["C-level executives", "Middle management", "Department teams", "Mixed audience"])
-- "Should we focus on strategic overview or implementation details?" (select: ["Strategic overview", "Implementation roadmap", "Balanced approach", "Deep implementation"])
+- Slide Count: Consider strategic depth, implementation details, stakeholder levels
+- Questions: "What's your primary audience role?" (select: ["C-level executives", "Middle management", "Department teams", "Mixed audience"])
 
 **For Technical Content:**
-- "What's the technical expertise of your audience?" (select: ["Beginner", "Intermediate", "Advanced", "Mixed levels"])
-- "Should we include code examples and technical demos?" (boolean: true)
+- Slide Count: Factor in technical complexity, code examples, implementation steps
+- Questions: "What's the technical expertise of your audience?" (select: ["Beginner", "Intermediate", "Advanced", "Mixed levels"])
 
 **For Educational Content:**
-- "What's the primary learning objective?" (select: ["Awareness building", "Skill development", "Comprehensive training", "Quick reference"])
-- "Should we include hands-on exercises and examples?" (boolean: true)
+- Slide Count: Consider learning objectives, exercise time, example complexity
+- Questions: "What's the primary learning objective?" (select: ["Awareness building", "Skill development", "Comprehensive training", "Quick reference"])
 
-Remember: NO number inputs, only select dropdowns and boolean toggles!`;
+Perform both slide estimation and question generation in a single comprehensive analysis!`;
     }
 
-    addSlideCountQuestion(generatedQuestions, aiRecommendedSlides) {
+    addSlideCountQuestion(generatedQuestions, aiRecommendedSlides, userSpecified = false) {
         // Generate slide count range around AI recommendation
         const slideRange = this.generateSlideRange(aiRecommendedSlides || PRESENTATION_CONFIG.default_slides);
         
+        const recommendationSource = userSpecified ? "user specification" : 
+                                    aiRecommendedSlides ? "AI analysis of your content" : "default recommendation";
+        
         const slideCountQuestion = {
             id: "slide_count",
-            question: `How many slides would you like in your presentation? (Recommended: ${aiRecommendedSlides || PRESENTATION_CONFIG.default_slides} slides based on AI analysis)`,
+            question: `How many slides would you like in your presentation? (Recommended: ${aiRecommendedSlides || PRESENTATION_CONFIG.default_slides} slides based on ${recommendationSource})`,
             field_type: "select",
             options: slideRange,
             required: true,
@@ -144,8 +221,8 @@ Remember: NO number inputs, only select dropdowns and boolean toggles!`;
                 max: PRESENTATION_CONFIG.max_slides 
             },
             recommendation: aiRecommendedSlides || PRESENTATION_CONFIG.default_slides,
-            recommendation_source: aiRecommendedSlides ? "AI analysis of your content" : "default recommendation",
-            ai_generated: !!aiRecommendedSlides
+            recommendation_source: recommendationSource,
+            ai_generated: !!aiRecommendedSlides && !userSpecified
         };
 
         // Add slide count as first question, followed by generated questions
