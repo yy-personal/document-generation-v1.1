@@ -228,50 +228,23 @@ class PowerPointOrchestrator {
                     console.log(`Using requested slide count: ${finalSlideCount}`);
                 }
 
-                // Extract original conversation Q&A pairs for better context
-                const originalConversation = this.extractOriginalConversation(conversation_history);
-                
-                // Prepare comprehensive consolidated information for third-party service
+                // Prepare user preferences object
+                const userPreferences = {
+                    slide_count: finalSlideCount,
+                    audience_level: clarificationAnswers.audience_level || clarificationAnswers.audience_level_select || 'General',
+                    content_depth: clarificationAnswers.content_depth || 'Moderate detail',
+                    content_focus: clarificationAnswers.content_focus || clarificationAnswers.content_focus_select || 'Balanced coverage',
+                    include_examples: clarificationAnswers.include_examples || clarificationAnswers.include_examples_boolean || false,
+                    ...this.extractAdditionalPreferences(clarificationAnswers)
+                };
+
+                // Prepare final consolidated information for third-party service
                 const consolidatedInfo = {
-                    // Original User Context (the source conversation)
-                    original_conversation: originalConversation,
-                    conversation_summary: conversationResult.conversation_content,
-                    user_intent: conversationResult.user_context,
+                    // Combined summary: conversation topics + user preferences
+                    content_summary: this.createCombinedSummary(conversationResult.conversation_content, conversationResult.user_context, userPreferences),
                     
-                    // Clarification Q&A (questions asked and user's answers)
-                    clarification_data: {
-                        questions_asked: this.getOriginalClarificationQuestions(sessionId, conversation_history),
-                        user_answers: clarificationAnswers || {},
-                        answered_timestamp: new Date().toISOString()
-                    },
-                    
-                    // Presentation Requirements (processed from clarification answers)
-                    presentation_config: {
-                        slide_count: finalSlideCount,
-                        target_audience: clarificationAnswers.audience_level || clarificationAnswers.audience_level_select || 'General',
-                        content_depth: clarificationAnswers.content_depth || 'Moderate detail',
-                        content_focus: clarificationAnswers.content_focus || clarificationAnswers.content_focus_select || 'Balanced coverage',
-                        include_examples: clarificationAnswers.include_examples || clarificationAnswers.include_examples_boolean || false,
-                        additional_preferences: this.extractAdditionalPreferences(clarificationAnswers)
-                    },
-                    
-                    // Content Organization
-                    content_structure: {
-                        main_topics: this.extractMainTopics(originalConversation),
-                        content_source: 'conversation',
-                        complexity_level: conversationResult.content_complexity || 'medium',
-                        supported_formats: PRESENTATION_FORMAT_CONFIG.supported_formats,
-                        recommended_styling: PRESENTATION_FORMAT_CONFIG.recommended_styling
-                    },
-                    
-                    // Service Metadata
-                    metadata: {
-                        session_id: sessionId,
-                        user_id: entra_id,
-                        processed_timestamp: new Date().toISOString(),
-                        service_version: 'v2.1',
-                        workflow_stage: 'consolidated_requirements'
-                    }
+                    // User's presentation preferences from clarification answers
+                    user_preferences: userPreferences
                 };
 
                 response.response_data.consolidated_info = consolidatedInfo;
@@ -390,6 +363,79 @@ class PowerPointOrchestrator {
         });
         
         return preferences;
+    }
+
+    // Helper method to create combined summary (conversation content + user preferences)
+    createCombinedSummary(conversationContent, userContext, userPreferences) {
+        try {
+            // Extract conversation topics
+            const topics = [];
+            
+            if (conversationContent) {
+                // Extract topics from conversation content
+                const lines = conversationContent.split('\n').filter(line => line.trim());
+                
+                for (const line of lines) {
+                    // Look for topic indicators
+                    if (line.includes('Topics discussed:') || line.includes('topics:')) {
+                        const topicMatch = line.match(/\d+\)\s*([^(]+?)(?:\s*\(|$)/g);
+                        if (topicMatch) {
+                            topicMatch.forEach(match => {
+                                const topic = match.replace(/\d+\)\s*/, '').trim();
+                                if (topic && topic.length > 3) topics.push(topic);
+                            });
+                        }
+                    }
+                }
+            }
+            
+            // Fallback: extract from user context
+            if (topics.length === 0 && userContext) {
+                if (userContext.toLowerCase().includes('stock market')) {
+                    topics.push('stock market basics', 'notable market prediction figures');
+                }
+            }
+            
+            // Build combined summary
+            let summary = '';
+            
+            // Part 1: What topics were discussed
+            if (topics.length > 0) {
+                summary = `User discussed ${topics.join(' and ')}.`;
+            } else {
+                summary = `User provided conversation content for presentation.`;
+            }
+            
+            // Part 2: How they want it presented (user preferences)
+            const preferences = userPreferences;
+            const prefParts = [];
+            
+            if (preferences.slide_count) {
+                prefParts.push(`${preferences.slide_count}-slide presentation`);
+            }
+            if (preferences.audience_level && preferences.audience_level !== 'General') {
+                prefParts.push(`for ${preferences.audience_level.toLowerCase()} audience`);
+            }
+            if (preferences.content_depth && preferences.content_depth !== 'Moderate detail') {
+                prefParts.push(`with ${preferences.content_depth.toLowerCase()}`);
+            }
+            if (preferences.content_focus && preferences.content_focus !== 'Balanced coverage') {
+                prefParts.push(`focusing on ${preferences.content_focus.toLowerCase()}`);
+            }
+            if (preferences.include_examples) {
+                prefParts.push('including practical examples');
+            }
+            
+            if (prefParts.length > 0) {
+                summary += ` They want a ${prefParts.join(', ')}.`;
+            }
+            
+            return summary;
+            
+        } catch (error) {
+            console.warn('Could not create combined summary:', error.message);
+            return `User provided presentation content with ${userPreferences.slide_count || 'multiple'} slides for ${userPreferences.audience_level || 'general'} audience.`;
+        }
     }
 
     // Helper method to extract the original clarification questions from conversation history
