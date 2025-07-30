@@ -189,11 +189,14 @@ Return JSON with:
 
 ## IMPORTANT: For Conversation History Requests
 When user_message contains structured conversation history (JSON with conversation array):
-- Set "show_clarification_questions": true
-- Set "need_slide_estimation": true
+- MUST SET "show_clarification_questions": true
+- MUST SET "need_slide_estimation": true
 - Set "intent": "CONVERSATION_HISTORY"
 - Extract conversation content for slide estimation
 - Set "response_text": "Please answer these questions to customize your presentation:"
+
+## CRITICAL: Both flags are required for proper workflow
+If conversation history is detected, you MUST set both show_clarification_questions AND need_slide_estimation to true.
 
 Be conversational, helpful, and guide users through the presentation creation process.`;
     }
@@ -264,7 +267,6 @@ Provide a helpful response and indicate whether presentation generation should p
             if (message.role === 'user' && message.content) {
                 const documentInfo = this.extractDocumentContent(message.content);
                 if (documentInfo.has_document) {
-                    console.log('[ConversationManager] Found document content in conversation history');
                     return documentInfo.document_content;
                 }
             }
@@ -406,10 +408,8 @@ Provide a helpful response and indicate whether presentation generation should p
         // Strategy 1: Try direct parsing first
         try {
             const answers = JSON.parse(rawJsonString);
-            console.log('[ConversationManager] JSON parsed successfully on first attempt');
             return answers;
         } catch (error) {
-            console.log('[ConversationManager] Direct JSON parsing failed, attempting repairs...');
         }
 
         // Strategy 2: Clean and repair common JSON issues
@@ -435,10 +435,8 @@ Provide a helpful response and indicate whether presentation generation should p
 
         try {
             const answers = JSON.parse(cleanedJson);
-            console.log('[ConversationManager] JSON parsed successfully after cleaning');
             return answers;
         } catch (error) {
-            console.log('[ConversationManager] Cleaning failed, attempting regex extraction...');
         }
 
         // Strategy 3: Extract key-value pairs using regex (last resort)
@@ -462,12 +460,9 @@ Provide a helpful response and indicate whether presentation generation should p
             }
             
             if (Object.keys(answers).length > 0) {
-                console.log('[ConversationManager] Successfully extracted key-value pairs using regex');
-                console.log('[ConversationManager] Extracted answers:', JSON.stringify(answers));
                 return answers;
             }
         } catch (error) {
-            console.log('[ConversationManager] Regex extraction failed:', error.message);
         }
 
         console.error('[ConversationManager] All parsing strategies failed for:', rawJsonString);
@@ -486,13 +481,11 @@ Provide a helpful response and indicate whether presentation generation should p
             return parsed;
         } catch (error) {
             console.warn('[ConversationManager] Failed to parse AI response as JSON:', error.message);
-            console.log('[ConversationManager] Raw content:', content);
             
             // Fallback: Try to extract JSON from markdown code blocks
             const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
             if (jsonMatch) {
                 try {
-                    console.log('[ConversationManager] Found JSON in code block, trying to parse...');
                     const parsed = JSON.parse(jsonMatch[1]);
                     return parsed;
                 } catch (codeBlockError) {
@@ -505,7 +498,6 @@ Provide a helpful response and indicate whether presentation generation should p
             const responseTextMatch = content.match(/"response_text":\s*"([^"]*(?:\\.[^"]*)*)"/);
             if (responseTextMatch) {
                 extractedResponseText = responseTextMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
-                console.log('[ConversationManager] Extracted response_text from malformed JSON');
             }
             
             // Ultimate fallback: Return a clean default structure

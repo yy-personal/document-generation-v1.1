@@ -21,11 +21,6 @@ class BaseAgent {
             }
         });
         
-        console.log(`Initialized ${agentName} with config:`, {
-            max_tokens: this.config.max_tokens,
-            temperature: this.config.temperature,
-            purpose: this.config.purpose
-        });
     }
 
     /**
@@ -45,7 +40,6 @@ class BaseAgent {
                 presence_penalty: overrides.presence_penalty || 0.0
             };
 
-            console.log(`[${this.agentName}] Making AI call with ${messages.length} messages`);
             
             const response = await this.openai.chat.completions.create(params);
             
@@ -55,7 +49,6 @@ class BaseAgent {
                 model: response.model
             };
 
-            console.log(`[${this.agentName}] AI call completed. Tokens used: ${response.usage.total_tokens}`);
             
             return result;
 

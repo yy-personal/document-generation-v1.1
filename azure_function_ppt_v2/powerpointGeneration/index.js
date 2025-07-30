@@ -39,7 +39,7 @@ module.exports = async function (context, req) {
         const errorResponse = {
             response_data: {
                 status: 'error',
-                session_id: requestBody?.session_id || 'N/A',
+                session_id: requestBody?.sessionhistory_session_id || 'N/A',
                 error_message: `Server error: ${error.message}`
             }
         };

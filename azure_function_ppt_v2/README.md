@@ -67,12 +67,21 @@ ConversationManager → ClarificationQuestionGenerator
 POST /api/powerpointGeneration
 ```
 
+### Database Field Mapping
+
+The service uses the following database field mapping:
+
+- `user_message` - Main content field (required)
+- `sessionhistory_entra_id` - User identifier (can be empty, replaces `entra_id`)
+- `sessionhistory_session_id` - Session identifier (can be empty, no autogeneration)
+- `conversation_history` - Conversation context (array, can be empty)
+
 ### Workflow Example
 ```json
 // Stage 1: Auto-trigger clarification questions (conversation history provided)
 {
   "user_message": "{\"session_id\": \"abc-123\", \"conversation\": [{\"question\": \"Tell me about stock market\", \"response\": \"Stock market involves...\"}]}",
-  "session_id": "PPTV2...",
+  "sessionhistory_session_id": "PPTV2...",
   "conversation_history": [
     {
       "session_id": "PPTV2...",
@@ -81,15 +90,15 @@ POST /api/powerpointGeneration
       ]
     }
   ],
-  "entra_id": "user-123"
+  "sessionhistory_entra_id": "user-123"
 }
 
 // Stage 2: Submit clarification answers
 {
   "user_message": "[clarification_answers]{\"slide_count\": 12, \"audience_level\": \"Intermediate\", \"include_examples\": true, \"content_depth\": \"Moderate detail\"}",
-  "session_id": "PPTV2...",
+  "sessionhistory_session_id": "PPTV2...",
   "conversation_history": [...],
-  "entra_id": "user-123"
+  "sessionhistory_entra_id": "user-123"
 }
 ```
 

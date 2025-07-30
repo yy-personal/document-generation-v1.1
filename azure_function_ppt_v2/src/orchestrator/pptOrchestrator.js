@@ -24,20 +24,20 @@ class PowerPointOrchestrator {
         try {
             console.log('Processing conversation request:', {
                 hasMessage: !!requestData.user_message,
-                sessionId: requestData.session_id,
+                sessionId: requestData.sessionhistory_session_id,
                 hasHistory: !!requestData.conversation_history
             });
 
-            // Extract request data
+            // Extract request data with database field mapping
             const {
                 user_message,
-                entra_id,
-                session_id,
+                sessionhistory_entra_id: entra_id,
+                sessionhistory_session_id,
                 conversation_history = []
             } = requestData;
 
-            // Generate or use existing session ID
-            const sessionId = session_id || generateSessionId();
+            // Use sessionhistory_session_id (no autogeneration)
+            const sessionId = sessionhistory_session_id;
 
             // Initialize response structure
             const response = {
@@ -192,7 +192,6 @@ class PowerPointOrchestrator {
                 const cleanResponseText = conversationResult.response_text || "I understand your message. Please let me know if you'd like to create a presentation.";
                 response.response_data.response_text = cleanResponseText;
                 
-                console.log('Setting response_text to:', cleanResponseText.substring(0, 100) + '...');
 
                 // Add assistant response to history
                 updatedHistory.push({
@@ -206,8 +205,6 @@ class PowerPointOrchestrator {
                 // Explicitly ensure status is correct
                 response.response_data.status = 'completed';
                 
-                console.log('Final response status:', response.response_data.status);
-                console.log('Final response_text (first 100 chars):', cleanResponseText.substring(0, 100));
                 
                 return response;
             } else {
@@ -222,10 +219,8 @@ class PowerPointOrchestrator {
                 let finalSlideCount = PRESENTATION_CONFIG.default_slides;
                 if (clarificationAnswers && clarificationAnswers.slide_count) {
                     finalSlideCount = parseInt(clarificationAnswers.slide_count);
-                    console.log(`Using user-specified slide count: ${finalSlideCount}`);
                 } else if (requestedSlideCount) {
                     finalSlideCount = parseInt(requestedSlideCount);
-                    console.log(`Using requested slide count: ${finalSlideCount}`);
                 }
 
                 // Prepare user preferences object
@@ -286,7 +281,7 @@ class PowerPointOrchestrator {
             return {
                 response_data: {
                     status: 'error',
-                    session_id: requestData.session_id || 'unknown',
+                    session_id: requestData.sessionhistory_session_id || 'unknown',
                     error_message: error.message,
                     conversation_history: requestData.conversation_history || []
                 }
@@ -294,19 +289,6 @@ class PowerPointOrchestrator {
         }
     }
 
-    formatConversationResponse(conversationResult, slideEstimate = null) {
-        let response = conversationResult.response_text;
-        
-        if (slideEstimate) {
-            response += `\n\nBased on your document, I estimate this presentation would have approximately ${slideEstimate.estimated_slides} slides. When you're ready, click "Create Presentation" to generate the PowerPoint file.`;
-        }
-        
-        return response;
-    }
-
-    formatGenerationResponse(slideEstimate, pptxResult) {
-        return `PowerPoint presentation generated successfully!\n\nPresentation Details:\n- Slides: ${slideEstimate.estimated_slides}\n- File: ${pptxResult.filename}\n- Size: ${Math.round(pptxResult.file_size_kb)}KB\n\nYour presentation is ready for download.`;
-    }
 
     // Helper method to extract original conversation Q&A pairs
     extractOriginalConversation(conversation_history) {
@@ -380,78 +362,6 @@ class PowerPointOrchestrator {
         return preferences;
     }
 
-    // Helper method to create combined summary (conversation content + user preferences)
-    createCombinedSummary(conversationContent, userContext, userPreferences) {
-        try {
-            // Extract conversation topics
-            const topics = [];
-            
-            if (conversationContent) {
-                // Extract topics from conversation content
-                const lines = conversationContent.split('\n').filter(line => line.trim());
-                
-                for (const line of lines) {
-                    // Look for topic indicators
-                    if (line.includes('Topics discussed:') || line.includes('topics:')) {
-                        const topicMatch = line.match(/\d+\)\s*([^(]+?)(?:\s*\(|$)/g);
-                        if (topicMatch) {
-                            topicMatch.forEach(match => {
-                                const topic = match.replace(/\d+\)\s*/, '').trim();
-                                if (topic && topic.length > 3) topics.push(topic);
-                            });
-                        }
-                    }
-                }
-            }
-            
-            // Fallback: extract from user context
-            if (topics.length === 0 && userContext) {
-                if (userContext.toLowerCase().includes('stock market')) {
-                    topics.push('stock market basics', 'notable market prediction figures');
-                }
-            }
-            
-            // Build combined summary
-            let summary = '';
-            
-            // Part 1: What topics were discussed
-            if (topics.length > 0) {
-                summary = `User discussed ${topics.join(' and ')}.`;
-            } else {
-                summary = `User provided conversation content for presentation.`;
-            }
-            
-            // Part 2: How they want it presented (user preferences)
-            const preferences = userPreferences;
-            const prefParts = [];
-            
-            if (preferences.slide_count) {
-                prefParts.push(`${preferences.slide_count}-slide presentation`);
-            }
-            if (preferences.audience_level && preferences.audience_level !== 'General') {
-                prefParts.push(`for ${preferences.audience_level.toLowerCase()} audience`);
-            }
-            if (preferences.content_depth && preferences.content_depth !== 'Moderate detail') {
-                prefParts.push(`with ${preferences.content_depth.toLowerCase()}`);
-            }
-            if (preferences.content_focus && preferences.content_focus !== 'Balanced coverage') {
-                prefParts.push(`focusing on ${preferences.content_focus.toLowerCase()}`);
-            }
-            if (preferences.include_examples) {
-                prefParts.push('including practical examples');
-            }
-            
-            if (prefParts.length > 0) {
-                summary += ` They want a ${prefParts.join(', ')}.`;
-            }
-            
-            return summary;
-            
-        } catch (error) {
-            console.warn('Could not create combined summary:', error.message);
-            return `User provided presentation content with ${userPreferences.slide_count || 'multiple'} slides for ${userPreferences.audience_level || 'general'} audience.`;
-        }
-    }
 
     // Helper method to extract the original clarification questions from conversation history
     getOriginalClarificationQuestions(sessionId, conversation_history) {
