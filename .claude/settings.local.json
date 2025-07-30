@@ -27,7 +27,9 @@
       "Bash(func start --port 7077)",
       "Bash(del test_master1.js test_background_only.js)",
       "Bash(grep:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(timeout 30 node:*)",
+      "Bash(npm run kill-port:*)"
     ],
     "deny": []
   }

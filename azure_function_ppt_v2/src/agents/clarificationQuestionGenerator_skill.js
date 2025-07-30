@@ -154,8 +154,8 @@ Perform both slide estimation and question generation in a single comprehensive 
 
     generateSlideRange(recommendedSlides) {
         const range = [];
-        const spread = 3; // ±3*step slides around recommendation
-        const step = 3;
+        const spread = 5; // ±5*step slides around recommendation (increased for more options)
+        const step = 3;   // Step of 3 slides between options
 
         // Find the nearest lower and upper multiples of step within bounds
         const min = Math.max(PRESENTATION_CONFIG.min_slides, recommendedSlides - spread * step);
@@ -173,6 +173,26 @@ Perform both slide estimation and question generation in a single comprehensive 
 
         // Remove duplicates and sort
         const uniqueRange = Array.from(new Set(range)).sort((a, b) => a - b);
+
+        // Ensure we have at least 11 options by adding more if needed
+        if (uniqueRange.length < 11) {
+            // Add more incremental options around the existing range
+            const minRange = Math.min(...uniqueRange);
+            const maxRange = Math.max(...uniqueRange);
+            
+            // Add options before min range
+            for (let i = minRange - step; i >= PRESENTATION_CONFIG.min_slides && uniqueRange.length < 11; i -= step) {
+                uniqueRange.unshift(i);
+            }
+            
+            // Add options after max range
+            for (let i = maxRange + step; i <= PRESENTATION_CONFIG.max_slides && uniqueRange.length < 11; i += step) {
+                uniqueRange.push(i);
+            }
+            
+            // Sort again after adding new options
+            uniqueRange.sort((a, b) => a - b);
+        }
 
         return uniqueRange;
     }
