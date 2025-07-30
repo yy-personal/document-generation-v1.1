@@ -62,7 +62,7 @@ Each service can be tested independently:
 - **Output**: Structured presentation requirements (`consolidated_info`) for third-party PowerPoint generators
 - **Processing time**: 8-12 seconds (Stage 1: 2-3s, Stage 2: 6-9s)
 - **Key Feature**: AI-powered slide estimation and contextual clarification questions
-- **Technology**: Node.js with intelligent requirements preprocessing
+- **Technology**: Node.js with intelligent requirements preprocessing and centralized prompt management
 - **Integration**: Feeds processed requirements to third-party PowerPoint generation services
 - **Status**: Production ready as preprocessing service for PowerPoint generators
 

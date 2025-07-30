@@ -171,6 +171,7 @@ If port 7076 is in use:
 - [x] **Slide Recommendations** - AI-powered slide count estimation with ranges
 - [x] **User Preferences** - Structured clarification answers processing
 - [x] **Error Handling** - Tolerant parsing for frontend integration
+- [x] **Centralized Prompt Management** - All system prompts stored in external .txt files
 
 ## Project Structure
 ```
@@ -186,8 +187,15 @@ azure_function_ppt_v2/
 │   │   └── clarificationQuestionGenerator_skill.js  # Slide estimation & question generation
 │   ├── orchestrator/
 │   │   └── pptOrchestrator.js     # Pipeline management
-│   └── config/
-│       └── config.js              # Centralized configuration
+│   ├── config/
+│   │   └── config.js              # Centralized configuration
+│   ├── prompts/
+│   │   ├── conversation_manager_system.txt          # ConversationManager system prompt
+│   │   ├── clarification_question_generator_system.txt  # ClarificationQuestionGenerator system prompt
+│   │   ├── consolidation_system.txt                 # Consolidation workflow system prompt
+│   │   └── README.md              # Prompt management documentation
+│   └── utils/
+│       └── promptLoader.js        # Centralized prompt management utility
 ├── test/
 │   ├── test-clarification-workflow.js  # 2-stage workflow tests
 │   └── test-conversation-workflow.js   # Legacy conversation tests
@@ -195,6 +203,29 @@ azure_function_ppt_v2/
 ├── host.json
 └── local.settings.json
 ```
+
+## Centralized Prompt Management
+
+The service uses a centralized prompt management system where all AI system prompts are stored in external `.txt` files for easy management and updates:
+
+- **Location**: `src/prompts/` directory
+- **Format**: Plain text files with variable placeholders
+- **Loading**: Dynamic loading via `PromptLoader` utility
+- **Caching**: Automatic caching for performance
+- **Variables**: Support for configuration and custom variable replacement
+
+### Available Prompts:
+- `conversation_manager_system.txt` - ConversationManager agent system prompt
+- `clarification_question_generator_system.txt` - ClarificationQuestionGenerator agent system prompt
+- `consolidation_system.txt` - Consolidation workflow system prompt
+
+### Usage:
+```javascript
+const { promptLoader } = require('../utils/promptLoader');
+const systemPrompt = promptLoader.loadPrompt('conversation_manager_system');
+```
+
+See `src/prompts/README.md` for detailed documentation on the prompt management system.
 
 ## Output Format
 

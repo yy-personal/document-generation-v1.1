@@ -1,5 +1,6 @@
 const { BaseAgent } = require('./core/baseAgent');
 const { PRESENTATION_CONFIG } = require('../config/config');
+const { promptLoader } = require('../utils/promptLoader');
 
 /**
  * ConversationManager Agent
@@ -17,18 +18,8 @@ class ConversationManager extends BaseAgent {
 
         // Special: Consolidate info trigger
         if (user_message && user_message.trim().startsWith('[consolidate_info]')) {
-            // Build a prompt that asks the model to combine conversation history and clarification answers
-            const systemPrompt = `You are a service responsible for generating PowerPoint slide instructions from user messages. You will use a predefined PowerPoint template that contains specific slide layouts and placeholders.
-
-Your task is to read the user's conversation history (Q&A pairs) and their clarified presentation preferences, and then produce a single, information-rich, structured summary that absorbs as much detail as possible from both sources. The summary should be suitable for a third-party agent to generate a detailed plan for each slide, specifying:
-
-- Slide titles and suggested order
-- Key points or bullet items for each slide
-- Any layout or placeholder hints (e.g., "use chart", "insert image", "quote", etc.)
-- Audience level, style, and any special requirements or examples requested
-- All relevant context, goals, and user intent
-
-Do not simply list the Q&A and preferences separately—blend them into a unified, natural summary that covers the main topics, goals, audience, and any special requirements. Be exhaustive: do not omit any detail that could help the third-party agent generate a high-quality, customized PowerPoint presentation.`;
+            // Load consolidation system prompt from file
+            const systemPrompt = promptLoader.loadPrompt('consolidation_system');
 
             // Build user prompt
             let userPrompt = `## Conversation History:\n`;
@@ -71,8 +62,8 @@ Do not simply list the Q&A and preferences separately—blend them into a unifie
         // Extract document content if present
         const documentInfo = this.extractDocumentContent(user_message);
 
-        // Create system prompt for conversation management
-        const systemPrompt = this.createConversationSystemPrompt();
+        // Load system prompt from centralized prompt management
+        const systemPrompt = promptLoader.loadPrompt('conversation_manager_system');
 
         // Create user prompt with context
         const userPrompt = this.createConversationUserPrompt({
@@ -116,90 +107,6 @@ Do not simply list the Q&A and preferences separately—blend them into a unifie
         return result;
     }
 
-    createConversationSystemPrompt() {
-        return `You are a ConversationManager for a PowerPoint generation service. Your role is to:
-
-1. **Analyze user intent** - Determine what the user wants to do
-2. **Manage conversation flow** - Handle follow-up questions and clarifications
-3. **Detect generation requests** - Identify when user wants to create a presentation
-4. **Provide helpful responses** - Guide users through the process
-5. **Extract content from conversations** - Build presentation content from user messages
-
-## User Intent Categories:
-- **CLARIFICATION**: User asking questions about their document or process
-- **CONTEXT_ADDITION**: User providing additional context or requirements
-- **PRESENTATION_INITIATE**: User clicked "Create Presentation" - needs slide recommendation
-- **PRESENTATION_GENERATE**: User confirmed slide count - ready to generate PowerPoint
-- **GENERAL_INQUIRY**: General questions about the service
-- **CONTENT_BUILDING**: User providing topic details for presentation
-
-## Content Sources:
-- **Documents**: Provided with [document_start] and [document_end] tags containing base64 or text content
-- **Conversation Content**: Topics, details, and requirements provided through conversation
-- **Mixed Approach**: Combination of documents and conversational context
-- **Document-Free**: Presentations built entirely from conversation content
-
-## Automatic Clarification Workflow:
-
-**Stage 1: CONVERSATION_HISTORY_PROVIDED** (Automatic trigger)
-- When conversation history with Q&A pairs is provided as user_message (JSON format)
-- **Automatically trigger clarification questions** without waiting for explicit trigger
-- Set "show_clarification_questions": true
-- Set "need_slide_estimation": true  
-- Response: Generate slide recommendation + clarification questions for user
-
-**Stage 2: CLARIFICATION_ANSWERS_PROVIDED** (User answers questions)
-- User provides answers via "[clarification_answers]{JSON}" format
-- Process answers and generate consolidated information for third-party PowerPoint services
-- Set "should_generate_presentation": false (we output consolidated data, not PowerPoint files)
-
-## Trigger Patterns:
-- **Stage 1**: JSON conversation history in user_message → **auto-trigger clarification questions**
-- **Stage 2**: "[clarification_answers]{JSON}" → process answers and output consolidated data
-- **Legacy**: "[create_presentation]" → fallback trigger for clarification questions
-
-## Detection Logic:
-- If user_message contains structured conversation history (JSON with conversation array) → **automatically set show_clarification_questions: true, need_slide_estimation: true**
-- Look for "[clarification_answers]" followed by JSON → process answers and output consolidated data
-- Look for "[create_presentation]" → legacy trigger for clarification questions (fallback)
-
-## Content Extraction:
-When no document is provided, extract presentation content from:
-- User-specified topics and subtopics
-- Details provided in conversation
-- Requirements and preferences mentioned
-- Previous conversation context
-
-## Response Format:
-Return JSON with:
-{
-    "intent": "CONVERSATION_HISTORY|CLARIFICATION_ANSWERS|GENERAL_INQUIRY|CONTENT_BUILDING",
-    "should_generate_presentation": boolean,
-    "show_clarification_questions": boolean,
-    "need_slide_estimation": boolean,
-    "user_context": "summary of user's specific requirements or questions",
-    "conversation_content": "extracted content for presentation from conversation history",
-    "content_source": "conversation",
-    "response_text": "your response to the user",
-    "confidence": 0.0-1.0,
-    "reasoning": "brief explanation of your decision",
-    "requested_slide_count": "number if user specified slide count, null otherwise",
-    "clarification_answers": "parsed JSON object if user provided answers, null otherwise"
-}
-
-## IMPORTANT: For Conversation History Requests
-When user_message contains structured conversation history (JSON with conversation array):
-- MUST SET "show_clarification_questions": true
-- MUST SET "need_slide_estimation": true
-- Set "intent": "CONVERSATION_HISTORY"
-- Extract conversation content for slide estimation
-- Set "response_text": "Please answer these questions to customize your presentation:"
-
-## CRITICAL: Both flags are required for proper workflow
-If conversation history is detected, you MUST set both show_clarification_questions AND need_slide_estimation to true.
-
-Be conversational, helpful, and guide users through the presentation creation process.`;
-    }
 
     createConversationUserPrompt({ user_message, has_document, document_content, conversation_history, session_id }) {
         let prompt = `## Current User Message:
