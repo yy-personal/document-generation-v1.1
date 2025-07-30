@@ -1,22 +1,20 @@
 const { 
     AGENT_PIPELINE, 
     QUICK_RESPONSE_PIPELINE,
+    PRESENTATION_CONFIG,
+    PRESENTATION_FORMAT_CONFIG,
     generateSessionId 
 } = require('../config/config');
 
 // Import agents with updated naming convention
 const { ConversationManager } = require('../agents/conversationManager_agent');
 const { ClarificationQuestionGenerator } = require('../agents/clarificationQuestionGenerator_skill');
-const { ContentStructurer } = require('../agents/contentStructurer_skill');
-const { PptxGenerator } = require('../agents/pptxGenerator_skill');
 
 class PowerPointOrchestrator {
     constructor() {
         this.agents = {
             ConversationManager: new ConversationManager(),
-            ClarificationQuestionGenerator: new ClarificationQuestionGenerator(),
-            ContentStructurer: new ContentStructurer(),
-            PptxGenerator: new PptxGenerator()
+            ClarificationQuestionGenerator: new ClarificationQuestionGenerator()
         };
         
         this.conversationHistory = new Map(); // Store conversation history by session
@@ -47,10 +45,10 @@ class PowerPointOrchestrator {
                     status: 'processing',
                     session_id: sessionId,
                     conversation_history: conversation_history,
-                    pipeline_info: [],
-                    processing_info: {},
                     response_text: '',
-                    powerpoint_output: null
+                    powerpoint_output: null,
+                    // Keep minimal processing info for debugging only
+                    processing_info: {}
                 }
             };
 
@@ -63,8 +61,12 @@ class PowerPointOrchestrator {
                 entra_id
             });
 
-            response.response_data.pipeline_info.push('ConversationManager');
-            response.response_data.processing_info.conversation = conversationResult;
+            // Minimal processing info for debugging
+            response.response_data.processing_info = {
+                intent: conversationResult.intent || 'conversation',
+                content_source: conversationResult.content_source,
+                has_errors: !!conversationResult.error_info
+            };
 
             // Update conversation history
             const updatedHistory = [...conversation_history, {
@@ -102,7 +104,6 @@ class PowerPointOrchestrator {
                 const clarificationResult = await this.agents.ClarificationQuestionGenerator.process(clarificationInput);
                 const clarificationQuestions = clarificationResult.questions;
 
-                response.response_data.pipeline_info.push('ClarificationQuestionGenerator');
                 response.response_data.processing_info.slide_estimate = {
                     estimated_slides: clarificationResult.estimated_slides,
                     content_complexity: clarificationResult.content_complexity,
@@ -176,7 +177,6 @@ class PowerPointOrchestrator {
                         user_specified: clarificationResult.user_specified
                     };
                     
-                    response.response_data.pipeline_info.push('ClarificationQuestionGenerator (slide estimation only)');
                     response.response_data.processing_info.slide_estimate = slideEstimate;
                     response.response_data.show_slide_popup = true;
                     response.response_data.recommended_slides = slideEstimate.estimated_slides;
@@ -187,111 +187,108 @@ class PowerPointOrchestrator {
             } else if (!shouldGeneratePresentation) {
                 // Regular conversation - no presentation workflow
                 console.log('Regular conversation mode');
-                response.response_data.response_text = conversationResult.response_text;
+                
+                // Ensure we use clean response text, not raw JSON
+                const cleanResponseText = conversationResult.response_text || "I understand your message. Please let me know if you'd like to create a presentation.";
+                response.response_data.response_text = cleanResponseText;
+                
+                console.log('Setting response_text to:', cleanResponseText.substring(0, 100) + '...');
 
                 // Add assistant response to history
                 updatedHistory.push({
                     role: 'assistant',
-                    content: response.response_data.response_text,
+                    content: cleanResponseText,
                     timestamp: new Date().toISOString()
                 });
 
                 response.response_data.conversation_history = updatedHistory;
+                
+                // Explicitly ensure status is correct
                 response.response_data.status = 'completed';
+                
+                console.log('Final response status:', response.response_data.status);
+                console.log('Final response_text (first 100 chars):', cleanResponseText.substring(0, 100));
+                
                 return response;
             } else {
-                // Stage 2: Generate presentation with confirmed slide count
-                console.log('Stage 2: Generating presentation with user-confirmed slide count');
+                // Stage 2: Process clarification answers and return consolidated information
+                console.log('Stage 2: Processing clarification answers and preparing consolidated information');
 
                 if (!hasConversationContent) {
-                    throw new Error('Cannot generate presentation without conversation content');
+                    throw new Error('Cannot process clarification answers without conversation content');
                 }
 
-                // Step 2: Slide Estimation (or use user's choice)
-                let slideEstimate;
-                
+                // Finalize slide count based on user's choice
+                let finalSlideCount = PRESENTATION_CONFIG.default_slides;
                 if (clarificationAnswers && clarificationAnswers.slide_count) {
-                    // User provided slide count - skip AI estimation and use their choice
-                    console.log(`Step 3: Using user-specified slide count: ${clarificationAnswers.slide_count}`);
-                    slideEstimate = {
-                        estimated_slides: parseInt(clarificationAnswers.slide_count),
-                        content_complexity: "user_specified",
-                        reasoning: `User chose ${clarificationAnswers.slide_count} slides from clarification popup`,
-                        confidence: 1.0,
-                        user_specified: true
-                    };
-                    response.response_data.pipeline_info.push('SlideEstimator (user choice)');
-                } else {
-                    // No user choice - use ClarificationQuestionGenerator for slide estimation
-                    console.log('Step 3: Estimating slide count with ClarificationQuestionGenerator');
-                    const slideEstimateInput = {
-                        conversation_content: conversationResult.conversation_content,
-                        conversation_history: conversation_history,
-                        requested_slide_count: requestedSlideCount
-                    };
-
-                    const clarificationResult = await this.agents.ClarificationQuestionGenerator.process(slideEstimateInput);
-                    
-                    slideEstimate = {
-                        estimated_slides: clarificationResult.estimated_slides,
-                        content_complexity: clarificationResult.content_complexity,
-                        slide_breakdown: clarificationResult.slide_breakdown,
-                        complexity_factors: clarificationResult.complexity_factors,
-                        reasoning: clarificationResult.reasoning,
-                        confidence: clarificationResult.confidence,
-                        user_specified: clarificationResult.user_specified
-                    };
-                    
-                    response.response_data.pipeline_info.push('ClarificationQuestionGenerator (slide estimation only)');
+                    finalSlideCount = parseInt(clarificationAnswers.slide_count);
+                    console.log(`Using user-specified slide count: ${finalSlideCount}`);
+                } else if (requestedSlideCount) {
+                    finalSlideCount = parseInt(requestedSlideCount);
+                    console.log(`Using requested slide count: ${finalSlideCount}`);
                 }
 
-                response.response_data.processing_info.slide_estimate = slideEstimate;
-
-                // Step 3: Content Structuring
-                console.log('Step 3: Structuring content for slides');
-                const structuringInput = {
-                    conversation_content: conversationResult.conversation_content,
-                    slide_estimate: slideEstimate,
-                    user_context: conversationResult.user_context,
-                    content_source: 'conversation'
+                // Extract original conversation Q&A pairs for better context
+                const originalConversation = this.extractOriginalConversation(conversation_history);
+                
+                // Prepare comprehensive consolidated information for third-party service
+                const consolidatedInfo = {
+                    // Original User Context (the source conversation)
+                    original_conversation: originalConversation,
+                    conversation_summary: conversationResult.conversation_content,
+                    user_intent: conversationResult.user_context,
+                    
+                    // Clarification Q&A (questions asked and user's answers)
+                    clarification_data: {
+                        questions_asked: this.getOriginalClarificationQuestions(sessionId, conversation_history),
+                        user_answers: clarificationAnswers || {},
+                        answered_timestamp: new Date().toISOString()
+                    },
+                    
+                    // Presentation Requirements (processed from clarification answers)
+                    presentation_config: {
+                        slide_count: finalSlideCount,
+                        target_audience: clarificationAnswers.audience_level || clarificationAnswers.audience_level_select || 'General',
+                        content_depth: clarificationAnswers.content_depth || 'Moderate detail',
+                        content_focus: clarificationAnswers.content_focus || clarificationAnswers.content_focus_select || 'Balanced coverage',
+                        include_examples: clarificationAnswers.include_examples || clarificationAnswers.include_examples_boolean || false,
+                        additional_preferences: this.extractAdditionalPreferences(clarificationAnswers)
+                    },
+                    
+                    // Content Organization
+                    content_structure: {
+                        main_topics: this.extractMainTopics(originalConversation),
+                        content_source: 'conversation',
+                        complexity_level: conversationResult.content_complexity || 'medium',
+                        supported_formats: PRESENTATION_FORMAT_CONFIG.supported_formats,
+                        recommended_styling: PRESENTATION_FORMAT_CONFIG.recommended_styling
+                    },
+                    
+                    // Service Metadata
+                    metadata: {
+                        session_id: sessionId,
+                        user_id: entra_id,
+                        processed_timestamp: new Date().toISOString(),
+                        service_version: 'v2.1',
+                        workflow_stage: 'consolidated_requirements'
+                    }
                 };
 
-                // Add clarification answers for content structuring
-                if (clarificationAnswers) {
-                    structuringInput.clarification_answers = clarificationAnswers;
-                }
-
-                const structuredContent = await this.agents.ContentStructurer.process(structuringInput);
-
-                response.response_data.pipeline_info.push('ContentStructurer');
-                response.response_data.processing_info.content_structure = structuredContent;
-
-                // Step 4: PowerPoint Generation
-                console.log('Step 4: Generating PowerPoint file');
-                const pptxResult = await this.agents.PptxGenerator.process({
-                    structured_content: structuredContent,
-                    slide_estimate: slideEstimate,
-                    session_id: sessionId
-                });
-
-                response.response_data.pipeline_info.push('PptxGenerator');
-                response.response_data.powerpoint_output = pptxResult;
-
-                // Prepare final response
-                response.response_data.response_text = this.formatGenerationResponse(slideEstimate, pptxResult);
+                response.response_data.consolidated_info = consolidatedInfo;
+                response.response_data.response_text = `Presentation requirements processed successfully. ${finalSlideCount} slides will be created based on your preferences.`;
 
                 // Add assistant response to history
                 updatedHistory.push({
                     role: 'assistant',
                     content: response.response_data.response_text,
                     timestamp: new Date().toISOString(),
-                    powerpoint_generated: true
+                    consolidated_info_prepared: true
                 });
 
                 response.response_data.conversation_history = updatedHistory;
                 response.response_data.status = 'completed';
 
-                console.log('PowerPoint generation completed successfully');
+                console.log('Consolidated information preparation completed successfully');
                 return response;
             }
 
@@ -303,7 +300,6 @@ class PowerPointOrchestrator {
                     status: 'error',
                     session_id: requestData.session_id || 'unknown',
                     error_message: error.message,
-                    pipeline_info: [],
                     conversation_history: requestData.conversation_history || []
                 }
             };
@@ -322,6 +318,111 @@ class PowerPointOrchestrator {
 
     formatGenerationResponse(slideEstimate, pptxResult) {
         return `PowerPoint presentation generated successfully!\n\nPresentation Details:\n- Slides: ${slideEstimate.estimated_slides}\n- File: ${pptxResult.filename}\n- Size: ${Math.round(pptxResult.file_size_kb)}KB\n\nYour presentation is ready for download.`;
+    }
+
+    // Helper method to extract original conversation Q&A pairs
+    extractOriginalConversation(conversation_history) {
+        try {
+            // Find the conversation data in the history
+            const conversationEntry = conversation_history.find(entry => 
+                entry.content && typeof entry.content === 'string' && entry.content.includes('conversation')
+            );
+            
+            if (conversationEntry) {
+                const content = JSON.parse(conversationEntry.content);
+                if (content.conversation && Array.isArray(content.conversation)) {
+                    return content.conversation.map(item => ({
+                        question: item.question,
+                        response: item.response,
+                        question_id: item.question_id,
+                        response_timestamp: item.response_timestamp
+                    }));
+                }
+            }
+            
+            // Fallback: extract from regular conversation flow
+            return conversation_history
+                .filter(entry => entry.role === 'user')
+                .map((entry, index) => ({
+                    question: entry.content,
+                    response: conversation_history[conversation_history.indexOf(entry) + 1]?.content || null,
+                    sequence: index + 1,
+                    timestamp: entry.timestamp
+                }));
+                
+        } catch (error) {
+            console.warn('Could not parse conversation history:', error.message);
+            return [];
+        }
+    }
+
+    // Helper method to extract main topics from conversation
+    extractMainTopics(originalConversation) {
+        try {
+            if (!originalConversation || originalConversation.length === 0) {
+                return [];
+            }
+            
+            // Simple topic extraction based on questions
+            return originalConversation.map((item, index) => ({
+                topic_id: index + 1,
+                topic_question: item.question,
+                topic_summary: item.response ? item.response.substring(0, 150) + '...' : 'No response',
+                importance: index === 0 ? 'high' : 'medium' // First question usually most important
+            }));
+            
+        } catch (error) {
+            console.warn('Could not extract main topics:', error.message);
+            return [];
+        }
+    }
+
+    // Helper method to extract additional preferences from clarification answers
+    extractAdditionalPreferences(clarificationAnswers) {
+        const preferences = {};
+        
+        // Extract any preferences not already captured in main config
+        Object.keys(clarificationAnswers || {}).forEach(key => {
+            if (!['slide_count', 'audience_level', 'audience_level_select', 'content_depth', 
+                  'content_focus', 'content_focus_select', 'include_examples', 'include_examples_boolean'].includes(key)) {
+                preferences[key] = clarificationAnswers[key];
+            }
+        });
+        
+        return preferences;
+    }
+
+    // Helper method to extract the original clarification questions from conversation history
+    getOriginalClarificationQuestions(sessionId, conversation_history) {
+        try {
+            // Look for the assistant response that contained clarification questions
+            const clarificationResponse = conversation_history.find(entry => 
+                entry.role === 'assistant' && 
+                entry.content.includes('Please answer these questions to customize')
+            );
+            
+            // In a real implementation, you might store questions in session or extract from response
+            // For now, return a placeholder structure that third-party services can understand
+            return {
+                note: "Clarification questions were generated dynamically based on conversation analysis",
+                question_types: [
+                    "slide_count (AI-recommended based on content analysis)",
+                    "target_audience (select from predefined options)",
+                    "content_depth (level of detail preference)",
+                    "content_focus (emphasis areas)",
+                    "include_examples (boolean preference)"
+                ],
+                generation_timestamp: clarificationResponse?.timestamp || new Date().toISOString(),
+                ai_generated: true
+            };
+            
+        } catch (error) {
+            console.warn('Could not extract clarification questions:', error.message);
+            return {
+                note: "Questions were generated but could not be retrieved from history",
+                ai_generated: true
+            };
+        }
     }
 }
 

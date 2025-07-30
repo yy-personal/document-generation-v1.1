@@ -1,18 +1,18 @@
-# PowerPoint Generation Service v2
+# Presentation Planning Service v2
 
-Next-generation conversational PowerPoint generation using PptxGenJS for enhanced presentation capabilities.
+Conversational presentation requirements gathering service for third-party PowerPoint generation integration.
 
 ## Overview
 
-This Node.js Azure Function provides a conversational interface for creating PowerPoint presentations from documents. Features a complete agent-based pipeline with placeholder PowerPoint generation ready for PptxGenJS integration.
+This Node.js Azure Function provides a conversational interface for gathering presentation requirements through a 2-stage clarification workflow. It analyzes conversation history to generate contextual questions and consolidated information for third-party PowerPoint generation services.
 
 ### Current Implementation Status
 
 **Conversational Interface** - COMPLETE - Multi-turn conversations with session management  
-**Document Processing** - COMPLETE - Supports PDF and Word documents via `[document]` tags  
-**Smart Slide Estimation** - COMPLETE - AI-powered slide count estimation (5-30 slides)  
-**Intelligent Content Structuring** - COMPLETE - Organized slide-by-slide content planning  
-**PowerPoint Generation** - COMPLETE - Full PptxGenJS implementation with custom branding
+**Smart Slide Estimation** - COMPLETE - AI-powered slide count recommendation (3-60 slides)  
+**Clarification Questions** - COMPLETE - Context-aware questions with "Let agent decide" options  
+**Consolidated Information** - COMPLETE - Structured output for third-party PowerPoint services  
+**Requirements Gathering** - COMPLETE - 2-stage workflow for presentation customization
 
 ## Quick Start
 
@@ -47,16 +47,18 @@ npm test    # Run conversation flow tests
 
 ### Agent Pipeline
 ```
-ConversationManager → DocumentProcessor → SlideEstimator → ContentStructurer → PptxGenerator
-        ↓                    ↓                ↓                ↓                ↓
-   Intent Analysis    Content Extraction   Slide Planning   Content Structure   PowerPoint File
+ConversationManager → ClarificationQuestionGenerator
+        ↓                           ↓
+   Intent Analysis            Slide Estimation & Questions
+        ↓                           ↓
+   Context Building           Consolidated Information
 ```
 
-### Conversational Flow
-1. **Document Upload** - User uploads document with optional questions
-2. **Context Building** - User adds requirements/clarifications
-3. **Generation Request** - User requests presentation creation
-4. **PowerPoint Delivery** - System generates base64 PowerPoint file
+### Clarification Workflow
+1. **Context Building** - User discusses presentation needs through conversation
+2. **Create Trigger** - User sends `[create_presentation]` to start workflow
+3. **Clarification Questions** - System generates up to 5 contextual questions with AI recommendations
+4. **Requirements Processing** - User answers are processed into consolidated information for third-party services
 
 ## API Usage
 
@@ -65,37 +67,37 @@ ConversationManager → DocumentProcessor → SlideEstimator → ContentStructur
 POST /api/powerpointGeneration
 ```
 
-### Conversation Example
+### Workflow Example
 ```json
-// 1. Upload document
+// Stage 1: Request clarification questions
 {
-  "user_message": "What presentation would work best? [document]<content>",
+  "user_message": "[create_presentation]",
+  "session_id": "PPTV2...",
+  "conversation_history": [
+    {
+      "session_id": "PPTV2...",
+      "conversation": [
+        {"question": "Tell me about robotics in workplace", "response": "Robotics involves..."}
+      ]
+    }
+  ],
   "entra_id": "user-123"
 }
 
-// 2. Add context (optional)
+// Stage 2: Submit clarification answers
 {
-  "user_message": "Focus on implementation timeline",
+  "user_message": "[clarification_answers]{\"slide_count\": 15, \"audience_level\": \"Advanced\", \"include_examples\": true}",
   "session_id": "PPTV2...",
-  "conversation_history": [...]
-}
-
-// 3. Generate presentation
-{
-  "user_message": "Create the presentation now",
-  "session_id": "PPTV2...",
-  "conversation_history": [...]
+  "conversation_history": [...],
+  "entra_id": "user-123"
 }
 ```
 
 ## Agent Architecture
 
 ### Core Agents
-- **ConversationManager** - Intent analysis, conversation flow
-- **DocumentProcessor** - Content extraction and organization  
-- **SlideEstimator** - Smart slide count estimation (5-30 slides)
-- **ContentStructurer** - Detailed slide layouts and content
-- **PptxGenerator** - PowerPoint file generation (placeholder)
+- **ConversationManager** - Intent analysis, conversation flow, bracket trigger detection
+- **ClarificationQuestionGenerator** - AI-powered slide estimation and contextual question generation
 
 ### Base Agent
 All agents inherit from `core/baseAgent.js` which provides:
@@ -119,8 +121,8 @@ LOCAL_DEV_CONFIG = {
 
 // Slide configuration
 PRESENTATION_CONFIG = {
-    max_slides: 30,
-    min_slides: 5,
+    max_slides: 60,
+    min_slides: 3,
     default_slides: 12
 }
 ```
@@ -133,32 +135,33 @@ If port 7076 is in use:
 
 ## Current Status
 
-### Completed (Ready for Production Testing)
-- [x] **Full Agent Pipeline** - ConversationManager → DocumentProcessor → SlideEstimator → ContentStructurer → PptxGenerator
-- [x] **Conversational Flow** - Multi-turn conversations with intent analysis and session management
-- [x] **Document Processing** - Supports PDF/Word via [document] tags with content extraction
-- [x] **Smart Slide Estimation** - AI-powered slide count analysis (5-30 slides) based on content complexity
-- [x] **Content Structuring** - Detailed slide-by-slide layouts with multiple content types
+### Completed (Production Ready)
+- [x] **2-Stage Clarification Workflow** - ConversationManager → ClarificationQuestionGenerator
+- [x] **Conversational Interface** - Multi-turn conversations with bracket trigger detection
+- [x] **AI-Powered Questions** - Context-aware clarification questions with "Let agent decide" options
+- [x] **Smart Slide Estimation** - AI slide count recommendation (3-60 slides) based on conversation analysis
+- [x] **Consolidated Information** - Structured output for third-party PowerPoint generation services
 - [x] **Session Management** - Conversation history tracking with unique session IDs
-- [x] **Centralized Configuration** - Single config file with OpenAI, agent, and service settings
-- [x] **Testing Infrastructure** - Comprehensive test script for conversation flow validation
+- [x] **Tolerant JSON Parsing** - 3-layer parsing strategy for malformed clarification answers
+- [x] **Centralized Configuration** - Single config file with simplified agent pipeline
+- [x] **Testing Infrastructure** - Comprehensive test scripts for both workflow stages
 - [x] **Port Management** - Auto-restart functionality with process cleanup
-- [x] **Code Quality** - Emoji-free codebase with consistent formatting
 
 ### Functional Capabilities (Current)
-- Upload documents and ask questions about presentation needs
-- Maintain conversation context across multiple interactions
-- Estimate optimal slide counts based on document content and user requirements
-- Structure content into professional slide layouts (title, agenda, content, two-column, table, summary, thank you)
-- Generate session-based responses with conversation history
-- Return placeholder PowerPoint data with proper metadata (filename, size, slide count)
+- Process conversation history to understand presentation context
+- Generate AI-powered slide count recommendations based on content complexity
+- Create contextual clarification questions (max 5) with field types: select, boolean, number
+- Provide "Let agent decide" options for all select questions as default
+- Process user clarification answers with tolerant JSON parsing
+- Output consolidated presentation requirements for third-party services
+- Maintain session context across 2-stage workflow
 
-### Ready for Next Development Session
-- [ ] **PptxGenJS Integration** - Replace placeholder with actual PowerPoint generation
-- [ ] **Slide Creation** - Implement PptxGenJS slide formatting for all layout types
-- [ ] **Table Support** - Add formatted table generation within slides
-- [ ] **Multi-column Layouts** - Enhanced two-column and complex layout support
-- [ ] **Company Templates** - Integration with branded PowerPoint templates
+### Integration Ready
+- [x] **Third-Party Service Integration** - Consolidated information output format ready
+- [x] **Question Generation** - Contextual questions based on conversation analysis
+- [x] **Slide Recommendations** - AI-powered slide count estimation with ranges
+- [x] **User Preferences** - Structured clarification answers processing
+- [x] **Error Handling** - Tolerant parsing for frontend integration
 
 ## Project Structure
 ```
@@ -169,39 +172,71 @@ azure_function_ppt_v2/
 ├── src/
 │   ├── agents/
 │   │   ├── core/
-│   │   │   └── baseAgent.js              # Base agent class
-│   │   ├── conversationManager_agent.js  # Conversation flow management
-│   │   ├── documentProcessor_skill.js    # Document content extraction
-│   │   ├── slideEstimator_skill.js       # Slide count estimation
-│   │   ├── contentStructurer_skill.js    # Content layout structuring
-│   │   └── pptxGenerator_skill.js        # PowerPoint generation
+│   │   │   └── baseAgent.js                         # Base agent class
+│   │   ├── conversationManager_agent.js             # Conversation flow & bracket triggers
+│   │   └── clarificationQuestionGenerator_skill.js  # Slide estimation & question generation
 │   ├── orchestrator/
 │   │   └── pptOrchestrator.js     # Pipeline management
 │   └── config/
 │       └── config.js              # Centralized configuration
 ├── test/
-│   └── test-poc.js               # Conversation tests
+│   ├── test-clarification-workflow.js  # 2-stage workflow tests
+│   └── test-conversation-workflow.js   # Legacy conversation tests
 ├── package.json
 ├── host.json
 └── local.settings.json
 ```
 
-## Development Notes
+## Output Format
 
-### For Next Session - PptxGenJS Integration
-The service is fully functional with all agent pipeline components complete. The only remaining work is replacing the placeholder PowerPoint generation in `src/agents/pptxGenerator_skill.js` with actual PptxGenJS implementation.
+### Stage 1: Clarification Questions
+```json
+{
+  "response_data": {
+    "show_clarification_popup": true,
+    "clarification_questions": [
+      {
+        "id": "slide_count",
+        "question": "How many slides would you like? (Recommended: 12 slides based on AI analysis)",
+        "field_type": "number",
+        "default_value": 12,
+        "validation": {"min": 3, "max": 60}
+      },
+      {
+        "id": "audience_level",
+        "question": "What is the technical level of your audience?",
+        "field_type": "select",
+        "options": ["Let agent decide", "Beginner", "Intermediate", "Advanced", "Mixed audience"],
+        "default_value": "Let agent decide"
+      }
+    ]
+  }
+}
+```
 
-**Key Integration Points:**
-- `generateWithPptxGenJS()` method needs implementation
-- Slide creation methods for different layouts (title, content, table, two-column)
-- PptxGenJS configuration for fonts, colors, and positioning
-- Base64 file generation and proper error handling
-
-**Current Placeholder Behavior:**
-- Returns mock base64 PowerPoint data
-- Simulates 2-second generation time
-- Provides proper response structure for frontend integration
+### Stage 2: Consolidated Information
+```json
+{
+  "response_data": {
+    "consolidated_info": {
+      "conversation_content": "Discussion about robotics in workplace...",
+      "user_context": "User wants comprehensive overview",
+      "content_source": "conversation",
+      "slide_count": 15,
+      "user_preferences": {
+        "slide_count": 15,
+        "audience_level": "Advanced",
+        "include_examples": true
+      },
+      "session_id": "PPTV2...",
+      "entra_id": "user-123",
+      "processed_timestamp": "2025-01-XX...",
+      "service_version": "v2.1"
+    }
+  }
+}
+```
 
 ---
 
-**PowerPoint Generation Service v2** - Complete conversational pipeline ready for PptxGenJS integration
+**Presentation Planning Service v2** - Complete 2-stage clarification workflow for third-party PowerPoint generation

@@ -8,10 +8,10 @@ module.exports = async function (context, req) {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                service: 'PowerPoint Generation v2',
+                service: 'Presentation Planning Service v2',
                 status: 'running',
-                version: '1.0.0',
-                description: 'Conversational PowerPoint generation using PptxGenJS'
+                version: '2.1.0',
+                description: 'Conversational presentation requirements gathering for third-party PowerPoint services'
             })
         };
         return;

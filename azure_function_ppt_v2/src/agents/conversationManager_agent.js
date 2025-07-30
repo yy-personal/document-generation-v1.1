@@ -93,29 +93,29 @@ class ConversationManager extends BaseAgent {
 - **Mixed Approach**: Combination of documents and conversational context
 - **Document-Free**: Presentations built entirely from conversation content
 
-## Two-Stage Workflow:
+## Automatic Clarification Workflow:
 
-**Stage 1: PRESENTATION_INITIATE** (Frontend "Create Presentation" button)
-- User clicks "Create Presentation" button on frontend
-- Message: "INITIATE_PRESENTATION_REQUEST" 
-- Response: Show slide recommendation with popup
-- Set "should_generate_presentation": false
-- Set "show_slide_recommendation": true
+**Stage 1: CONVERSATION_HISTORY_PROVIDED** (Automatic trigger)
+- When conversation history with Q&A pairs is provided as user_message (JSON format)
+- **Automatically trigger clarification questions** without waiting for explicit trigger
+- Set "show_clarification_questions": true
+- Set "need_slide_estimation": true  
+- Response: Generate slide recommendation + clarification questions for user
 
-**Stage 2: PRESENTATION_GENERATE** (User confirms slide count)
-- User confirms slide count from popup
-- Message: "GENERATE_PRESENTATION_WITH_X_SLIDES" (e.g., "GENERATE_PRESENTATION_WITH_12_SLIDES")
-- Response: Generate actual PowerPoint
-- Set "should_generate_presentation": true
-- Set "requested_slide_count": X
+**Stage 2: CLARIFICATION_ANSWERS_PROVIDED** (User answers questions)
+- User provides answers via "[clarification_answers]{JSON}" format
+- Process answers and generate consolidated information for third-party PowerPoint services
+- Set "should_generate_presentation": false (we output consolidated data, not PowerPoint files)
 
-## Exact Trigger Patterns:
-- **Stage 1**: "[create_presentation]" - Frontend "Create Presentation" button
-- **Stage 2**: "[slide_number_input]15" - User selects 15 slides from popup (number appended)
+## Trigger Patterns:
+- **Stage 1**: JSON conversation history in user_message → **auto-trigger clarification questions**
+- **Stage 2**: "[clarification_answers]{JSON}" → process answers and output consolidated data
+- **Legacy**: "[create_presentation]" → fallback trigger for clarification questions
 
 ## Detection Logic:
-- Look for exact "[create_presentation]" in user_message → set show_slide_recommendation: true
-- Look for "[slide_number_input]" followed by number → extract number and set should_generate_presentation: true
+- If user_message contains structured conversation history (JSON with conversation array) → **automatically set show_clarification_questions: true, need_slide_estimation: true**
+- Look for "[clarification_answers]" followed by JSON → process answers and output consolidated data
+- Look for "[create_presentation]" → legacy trigger for clarification questions (fallback)
 
 ## Content Extraction:
 When no document is provided, extract presentation content from:
@@ -127,17 +127,27 @@ When no document is provided, extract presentation content from:
 ## Response Format:
 Return JSON with:
 {
-    "intent": "CLARIFICATION|CONTEXT_ADDITION|PRESENTATION_INITIATE|PRESENTATION_GENERATE|GENERAL_INQUIRY|CONTENT_BUILDING",
+    "intent": "CONVERSATION_HISTORY|CLARIFICATION_ANSWERS|GENERAL_INQUIRY|CONTENT_BUILDING",
     "should_generate_presentation": boolean,
-    "show_slide_recommendation": boolean,
+    "show_clarification_questions": boolean,
+    "need_slide_estimation": boolean,
     "user_context": "summary of user's specific requirements or questions",
-    "conversation_content": "extracted content for presentation (when no document)",
-    "content_source": "document|conversation|mixed",
+    "conversation_content": "extracted content for presentation from conversation history",
+    "content_source": "conversation",
     "response_text": "your response to the user",
     "confidence": 0.0-1.0,
     "reasoning": "brief explanation of your decision",
-    "requested_slide_count": "number if user specified slide count, null otherwise"
+    "requested_slide_count": "number if user specified slide count, null otherwise",
+    "clarification_answers": "parsed JSON object if user provided answers, null otherwise"
 }
+
+## IMPORTANT: For Conversation History Requests
+When user_message contains structured conversation history (JSON with conversation array):
+- Set "show_clarification_questions": true
+- Set "need_slide_estimation": true
+- Set "intent": "CONVERSATION_HISTORY"
+- Extract conversation content for slide estimation
+- Set "response_text": "Please answer these questions to customize your presentation:"
 
 Be conversational, helpful, and guide users through the presentation creation process.`;
     }
@@ -416,6 +426,62 @@ Provide a helpful response and indicate whether presentation generation should p
 
         console.error('[ConversationManager] All parsing strategies failed for:', rawJsonString);
         return null;
+    }
+
+    /**
+     * Parse AI response content with error handling
+     * @param {string} content - Raw AI response content
+     * @returns {Object} Parsed response object
+     */
+    parseAIResponse(content) {
+        try {
+            // Try to parse as JSON first
+            const parsed = JSON.parse(content);
+            return parsed;
+        } catch (error) {
+            console.warn('[ConversationManager] Failed to parse AI response as JSON:', error.message);
+            console.log('[ConversationManager] Raw content:', content);
+            
+            // Fallback: Try to extract JSON from markdown code blocks
+            const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+            if (jsonMatch) {
+                try {
+                    console.log('[ConversationManager] Found JSON in code block, trying to parse...');
+                    const parsed = JSON.parse(jsonMatch[1]);
+                    return parsed;
+                } catch (codeBlockError) {
+                    console.warn('[ConversationManager] Failed to parse JSON from code block:', codeBlockError.message);
+                }
+            }
+            
+            // Fallback 2: Try to extract response_text from malformed JSON
+            let extractedResponseText = "I understand your message. Please let me know if you'd like to create a presentation.";
+            const responseTextMatch = content.match(/"response_text":\s*"([^"]*(?:\\.[^"]*)*)"/);
+            if (responseTextMatch) {
+                extractedResponseText = responseTextMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                console.log('[ConversationManager] Extracted response_text from malformed JSON');
+            }
+            
+            // Ultimate fallback: Return a clean default structure
+            console.warn('[ConversationManager] Using fallback response structure');
+            return {
+                should_generate_presentation: false,
+                show_slide_recommendation: false,
+                show_clarification_questions: false,
+                need_slide_estimation: false,
+                clarification_answers: null,
+                has_document_content: false,
+                conversation_content: "User provided conversation history about stock market topics",
+                user_context: "User is building content for potential presentation",
+                content_source: 'conversation',
+                response_text: extractedResponseText,
+                error_info: {
+                    original_error: error.message,
+                    parsing_fallback_used: true,
+                    fallback_strategy: 'clean_default'
+                }
+            };
+        }
     }
 
 }

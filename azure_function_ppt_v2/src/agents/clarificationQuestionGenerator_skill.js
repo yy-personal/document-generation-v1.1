@@ -123,16 +123,28 @@ class ClarificationQuestionGenerator extends BaseAgent {
 ### Question Categories to Consider:
 1. **Audience Level**: Technical expertise, business level, educational background
 2. **Content Focus**: Which aspects to emphasize from the conversation
-3. **Presentation Style**: Format, depth, visual approach
-4. **Content Inclusion**: Examples, case studies, detailed analysis
+3. **Content Depth**: Level of detail, overview vs detailed analysis
+4. **Content Inclusion**: Examples, case studies, detailed explanations
 5. **Contextual Preferences**: Based on detected content type (business/technical/educational)
 
+### Content Format Constraints:
+- Only bullet points and table formats are supported
+- NO visual style or design-related questions
+- Focus on content structure and information depth only
+
 ### Content Analysis Guidelines:
-- **Business Content**: Focus on strategic level, audience role, implementation vs overview
-- **Technical Content**: Focus on technical depth, implementation detail, audience expertise
-- **Educational Content**: Focus on learning objectives, complexity level, practical examples
-- **Multi-topic Content**: Focus on primary emphasis, topic prioritization
-- **Process/Procedure Content**: Focus on detail level, step-by-step vs overview
+- **Business Content**: Focus on strategic level, audience role, implementation vs overview, depth of analysis
+- **Technical Content**: Focus on technical depth, implementation detail, audience expertise, level of explanation
+- **Educational Content**: Focus on learning objectives, complexity level, practical examples, step-by-step detail
+- **Multi-topic Content**: Focus on primary emphasis, topic prioritization, content balance
+- **Process/Procedure Content**: Focus on detail level, step-by-step vs overview, supporting explanations
+
+### Question Focus Areas (NO Visual Style Questions):
+- Content depth and detail level
+- Audience understanding and expertise
+- Information prioritization and emphasis
+- Supporting materials (examples, case studies)
+- Content organization and structure
 
 ### Field Type Rules:
 - **select**: Dropdown with 3-5 predefined options + "Let agent decide" as fallback option
@@ -198,14 +210,17 @@ ${contentSection}## Context:
 **For Business Content:**
 - Slide Count: Consider strategic depth, implementation details, stakeholder levels
 - Questions: "What's your primary audience role?" (select: ["Let agent decide", "C-level executives", "Middle management", "Department teams", "Mixed audience"])
+- Content Focus: "What level of detail should we include?" (select: ["Let agent decide", "High-level overview", "Moderate detail", "Comprehensive analysis", "Executive summary"])
 
 **For Technical Content:**
-- Slide Count: Factor in technical complexity, code examples, implementation steps
+- Slide Count: Factor in technical complexity, implementation steps, supporting tables
 - Questions: "What's the technical expertise of your audience?" (select: ["Let agent decide", "Beginner", "Intermediate", "Advanced", "Mixed levels"])
+- Content Depth: "How much technical detail should we include?" (select: ["Let agent decide", "High-level concepts", "Moderate technical depth", "Detailed implementation", "Reference-level detail"])
 
 **For Educational Content:**
-- Slide Count: Consider learning objectives, exercise time, example complexity
+- Slide Count: Consider learning objectives, example complexity, supporting materials
 - Questions: "What's the primary learning objective?" (select: ["Let agent decide", "Awareness building", "Skill development", "Comprehensive training", "Quick reference"])
+- Supporting Content: "Should we include detailed examples?" (boolean: default true)
 
 **IMPORTANT**: ALWAYS include "Let agent decide" as the FIRST option in ALL select questions and set it as the default_value. This allows users to defer decisions to the AI when uncertain.
 

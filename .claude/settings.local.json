@@ -26,7 +26,8 @@
       "Bash(func start --port 7076)",
       "Bash(func start --port 7077)",
       "Bash(del test_master1.js test_background_only.js)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(true)"
     ],
     "deny": []
   }
