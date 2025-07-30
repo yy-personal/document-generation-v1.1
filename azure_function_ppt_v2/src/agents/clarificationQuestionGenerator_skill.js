@@ -256,36 +256,27 @@ Perform both slide estimation and question generation in a single comprehensive 
 
     generateSlideRange(recommendedSlides) {
         const range = [];
-        const spread = 3; // ±3 slides around recommendation
-        
-        // Generate range around recommendation
-        for (let i = recommendedSlides - spread; i <= recommendedSlides + spread; i++) {
-            // Ensure within config limits
-            if (i >= PRESENTATION_CONFIG.min_slides && i <= PRESENTATION_CONFIG.max_slides) {
-                range.push(i);
-            }
+        const spread = 3; // ±3*step slides around recommendation
+        const step = 3;
+
+        // Find the nearest lower and upper multiples of step within bounds
+        const min = Math.max(PRESENTATION_CONFIG.min_slides, recommendedSlides - spread * step);
+        const max = Math.min(PRESENTATION_CONFIG.max_slides, recommendedSlides + spread * step);
+
+        // Generate options in increments of step
+        for (let i = min; i <= max; i += step) {
+            range.push(i);
         }
-        
-        // Ensure minimum 5 options and add boundary values if needed
-        if (range.length < 5) {
-            // Add lower values if recommendation is high
-            if (recommendedSlides > PRESENTATION_CONFIG.min_slides + 2) {
-                for (let i = PRESENTATION_CONFIG.min_slides; i < range[0]; i++) {
-                    range.unshift(i);
-                    if (range.length >= 7) break; // Don't make dropdown too long
-                }
-            }
-            
-            // Add higher values if recommendation is low
-            if (recommendedSlides < PRESENTATION_CONFIG.max_slides - 2) {
-                for (let i = range[range.length - 1] + 1; i <= PRESENTATION_CONFIG.max_slides; i++) {
-                    range.push(i);
-                    if (range.length >= 7) break; // Don't make dropdown too long
-                }
-            }
+
+        // Ensure recommendedSlides is included (in case it's not a multiple of 3)
+        if (!range.includes(recommendedSlides) && recommendedSlides >= PRESENTATION_CONFIG.min_slides && recommendedSlides <= PRESENTATION_CONFIG.max_slides) {
+            range.push(recommendedSlides);
         }
-        
-        return range.sort((a, b) => a - b);
+
+        // Remove duplicates and sort
+        const uniqueRange = Array.from(new Set(range)).sort((a, b) => a - b);
+
+        return uniqueRange;
     }
 }
 
