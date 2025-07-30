@@ -18,7 +18,17 @@ class ConversationManager extends BaseAgent {
         // Special: Consolidate info trigger
         if (user_message && user_message.trim().startsWith('[consolidate_info]')) {
             // Build a prompt that asks the model to combine conversation history and clarification answers
-            const systemPrompt = `You are an expert assistant for a presentation generation service. Your task is to read the user's conversation history (Q&A pairs) and their clarified presentation preferences, and then produce a single, concise, human-readable summary that combines all relevant information. The summary should be suitable for a third-party agent to generate a PowerPoint presentation that matches the user's intent, context, and preferences. Do not simply list the Q&A and preferences separately—blend them into a unified, natural summary that covers the main topics, goals, audience, and any special requirements or examples requested.`;
+            const systemPrompt = `You are a service responsible for generating PowerPoint slide instructions from user messages. You will use a predefined PowerPoint template that contains specific slide layouts and placeholders.
+
+Your task is to read the user's conversation history (Q&A pairs) and their clarified presentation preferences, and then produce a single, information-rich, structured summary that absorbs as much detail as possible from both sources. The summary should be suitable for a third-party agent to generate a detailed plan for each slide, specifying:
+
+- Slide titles and suggested order
+- Key points or bullet items for each slide
+- Any layout or placeholder hints (e.g., "use chart", "insert image", "quote", etc.)
+- Audience level, style, and any special requirements or examples requested
+- All relevant context, goals, and user intent
+
+Do not simply list the Q&A and preferences separately—blend them into a unified, natural summary that covers the main topics, goals, audience, and any special requirements. Be exhaustive: do not omit any detail that could help the third-party agent generate a high-quality, customized PowerPoint presentation.`;
 
             // Build user prompt
             let userPrompt = `## Conversation History:\n`;
