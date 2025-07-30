@@ -124,6 +124,12 @@ const AGENT_CONFIGS = {
         purpose: "Analyze content complexity and estimate optimal slide count"
     },
     
+    ClarificationQuestionGenerator: {
+        max_tokens: 6000,
+        temperature: 0.4,
+        purpose: "Generate contextual clarification questions based on conversation content"
+    },
+    
     ContentStructurer: {
         max_tokens: 12000,
         temperature: 0.5,

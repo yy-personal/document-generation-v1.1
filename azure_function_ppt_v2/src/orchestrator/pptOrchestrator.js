@@ -8,6 +8,7 @@ const {
 const { ConversationManager } = require('../agents/conversationManager_agent');
 const { DocumentProcessor } = require('../agents/documentProcessor_skill');
 const { SlideEstimator } = require('../agents/slideEstimator_skill');
+const { ClarificationQuestionGenerator } = require('../agents/clarificationQuestionGenerator_skill');
 const { ContentStructurer } = require('../agents/contentStructurer_skill');
 const { PptxGenerator } = require('../agents/pptxGenerator_skill');
 
@@ -17,6 +18,7 @@ class PowerPointOrchestrator {
             ConversationManager: new ConversationManager(),
             DocumentProcessor: new DocumentProcessor(),
             SlideEstimator: new SlideEstimator(),
+            ClarificationQuestionGenerator: new ClarificationQuestionGenerator(),
             ContentStructurer: new ContentStructurer(),
             PptxGenerator: new PptxGenerator()
         };
@@ -109,14 +111,22 @@ class PowerPointOrchestrator {
 
                 const slideEstimateResult = await this.agents.SlideEstimator.process(slideEstimateInput);
                 
-                // Generate clarification questions with AI recommendation
-                const clarificationQuestions = this.agents.ConversationManager.generateClarificationQuestions(
-                    conversation_history, 
-                    slideEstimateResult.estimated_slides
-                );
+                // Generate contextual clarification questions using AI
+                const clarificationInput = {
+                    conversation_content: conversationResult.conversation_content,
+                    aiRecommendedSlides: slideEstimateResult.estimated_slides,
+                    conversation_history: conversation_history
+                };
+                
+                const clarificationResult = await this.agents.ClarificationQuestionGenerator.process(clarificationInput);
+                const clarificationQuestions = clarificationResult.questions;
 
-                response.response_data.pipeline_info.push('SlideEstimator');
+                response.response_data.pipeline_info.push('SlideEstimator', 'ClarificationQuestionGenerator');
                 response.response_data.processing_info.slide_estimate = slideEstimateResult;
+                response.response_data.processing_info.clarification_analysis = {
+                    content_analysis: clarificationResult.content_analysis,
+                    reasoning: clarificationResult.reasoning
+                };
                 response.response_data.show_clarification_popup = true;
                 response.response_data.clarification_questions = clarificationQuestions;
                 response.response_data.response_text = "Please answer these questions to customize your presentation:";
