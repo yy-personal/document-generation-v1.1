@@ -1,4 +1,5 @@
 const { BaseAgent } = require('./core/baseAgent');
+const { PRESENTATION_CONFIG } = require('../config/config');
 
 /**
  * ConversationManager Agent
@@ -356,15 +357,16 @@ Provide a helpful response and indicate whether presentation generation should p
 
         const questions = [];
 
-        // Question 1: Slide count with AI recommendation (always included)
+        // Question 1: Slide count with AI recommendation as dropdown range (always included)
+        const slideRange = this.generateSlideRange(recommendedSlides);
         questions.push({
             id: "slide_count",
             question: `How many slides would you like in your presentation? (Recommended: ${recommendedSlides} slides based on ${recommendationSource})`,
-            field_type: "number",
-            placeholder: recommendedSlides.toString(),
+            field_type: "select",
+            options: slideRange,
             required: true,
             default_value: recommendedSlides,
-            validation: { min: 5, max: 50 },
+            validation: { min: PRESENTATION_CONFIG.min_slides, max: PRESENTATION_CONFIG.max_slides },
             recommendation: recommendedSlides,
             recommendation_source: recommendationSource,
             ai_generated: !!aiRecommendedSlides
@@ -433,6 +435,45 @@ Provide a helpful response and indicate whether presentation generation should p
 
         // Return up to 5 questions
         return questions.slice(0, 5);
+    }
+
+    /**
+     * Generate slide count range around AI recommendation for dropdown
+     * @param {number} recommendedSlides - AI recommended slide count
+     * @returns {Array} Array of slide count options
+     */
+    generateSlideRange(recommendedSlides) {
+        const range = [];
+        const spread = 3; // ±3 slides around recommendation
+        
+        // Generate range around recommendation
+        for (let i = recommendedSlides - spread; i <= recommendedSlides + spread; i++) {
+            // Ensure within config limits
+            if (i >= PRESENTATION_CONFIG.min_slides && i <= PRESENTATION_CONFIG.max_slides) {
+                range.push(i);
+            }
+        }
+        
+        // Ensure minimum 5 options and add boundary values if needed
+        if (range.length < 5) {
+            // Add lower values if recommendation is high
+            if (recommendedSlides > PRESENTATION_CONFIG.min_slides + 2) {
+                for (let i = PRESENTATION_CONFIG.min_slides; i < range[0]; i++) {
+                    range.unshift(i);
+                    if (range.length >= 7) break; // Don't make dropdown too long
+                }
+            }
+            
+            // Add higher values if recommendation is low
+            if (recommendedSlides < PRESENTATION_CONFIG.max_slides - 2) {
+                for (let i = range[range.length - 1] + 1; i <= PRESENTATION_CONFIG.max_slides; i++) {
+                    range.push(i);
+                    if (range.length >= 7) break; // Don't make dropdown too long
+                }
+            }
+        }
+        
+        return range.sort((a, b) => a - b);
     }
 
     /**

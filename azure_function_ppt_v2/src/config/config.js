@@ -53,8 +53,8 @@ const SUPPORTED_OUTPUT_FORMATS = [
 // ====================================================================
 
 const PRESENTATION_CONFIG = {
-    max_slides: 50,        // Maximum allowed slides (hard limit)
-    min_slides: 5,         // Minimum slides for proper presentation structure
+    max_slides: 60,        // Maximum allowed slides (hard limit)
+    min_slides: 3,         // Minimum slides for proper presentation structure
     default_slides: 12,    // Default target when content complexity is medium
     use_case: "Conversational business presentations with PptxGenJS"
 };
