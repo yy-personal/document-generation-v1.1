@@ -157,21 +157,28 @@ class PowerPointOrchestrator {
                 console.log('Stage 1: Providing slide recommendation for popup');
                 
                 if (hasDocumentContent || hasConversationContent) {
-                    const slideEstimateInput = {};
+                    const slideEstimateInput = {
+                        conversation_content: conversationResult.conversation_content,
+                        conversation_history: conversation_history,
+                        requested_slide_count: conversationResult.requested_slide_count
+                    };
                     
+                    // Add document content if available
                     if (hasDocumentContent) {
                         slideEstimateInput.document_content = conversationResult.document_content;
                     }
-                    
-                    if (hasConversationContent) {
-                        slideEstimateInput.conversation_content = conversationResult.conversation_content;
-                    }
-                    
-                    slideEstimateInput.user_context = conversationResult.user_context;
 
-                    const slideEstimate = await this.agents.SlideEstimator.process(slideEstimateInput);
+                    const clarificationResult = await this.agents.ClarificationQuestionGenerator.process(slideEstimateInput);
                     
-                    response.response_data.pipeline_info.push('SlideEstimator');
+                    const slideEstimate = {
+                        estimated_slides: clarificationResult.estimated_slides,
+                        content_complexity: clarificationResult.content_complexity,
+                        reasoning: clarificationResult.reasoning,
+                        confidence: clarificationResult.confidence,
+                        user_specified: clarificationResult.user_specified
+                    };
+                    
+                    response.response_data.pipeline_info.push('ClarificationQuestionGenerator (slide estimation only)');
                     response.response_data.processing_info.slide_estimate = slideEstimate;
                     response.response_data.show_slide_popup = true;
                     response.response_data.recommended_slides = slideEstimate.estimated_slides;
@@ -243,28 +250,27 @@ class PowerPointOrchestrator {
                     };
                     response.response_data.pipeline_info.push('SlideEstimator (user choice)');
                 } else {
-                    // No user choice - use AI estimation
-                    console.log('Step 3: Estimating slide count with AI');
+                    // No user choice - use ClarificationQuestionGenerator for slide estimation
+                    console.log('Step 3: Estimating slide count with ClarificationQuestionGenerator');
                     const slideEstimateInput = {
-                        processed_content: documentResult,
-                        user_context: conversationResult.user_context
+                        conversation_content: conversationResult.conversation_content,
+                        conversation_history: conversation_history,
+                        requested_slide_count: requestedSlideCount
                     };
 
-                    if (hasDocumentContent) {
-                        slideEstimateInput.document_content = conversationResult.document_content;
-                    }
-
-                    if (hasConversationContent) {
-                        slideEstimateInput.conversation_content = conversationResult.conversation_content;
-                    }
-
-                    // Pass requested slide count if specified by user (legacy)
-                    if (requestedSlideCount) {
-                        slideEstimateInput.requested_slide_count = requestedSlideCount;
-                    }
-
-                    slideEstimate = await this.agents.SlideEstimator.process(slideEstimateInput);
-                    response.response_data.pipeline_info.push('SlideEstimator');
+                    const clarificationResult = await this.agents.ClarificationQuestionGenerator.process(slideEstimateInput);
+                    
+                    slideEstimate = {
+                        estimated_slides: clarificationResult.estimated_slides,
+                        content_complexity: clarificationResult.content_complexity,
+                        slide_breakdown: clarificationResult.slide_breakdown,
+                        complexity_factors: clarificationResult.complexity_factors,
+                        reasoning: clarificationResult.reasoning,
+                        confidence: clarificationResult.confidence,
+                        user_specified: clarificationResult.user_specified
+                    };
+                    
+                    response.response_data.pipeline_info.push('ClarificationQuestionGenerator (slide estimation only)');
                 }
 
                 response.response_data.processing_info.slide_estimate = slideEstimate;

@@ -239,15 +239,17 @@ Provide a helpful response and indicate whether presentation generation should p
         // Stage 2: [clarification_answers]{JSON_answers}
         const answersMatch = normalizedMessage.match(/\[clarification_answers\](.+)/);
         if (answersMatch) {
-            try {
-                const answers = JSON.parse(answersMatch[1]);
+            const rawJsonString = answersMatch[1];
+            const answers = this.parseAnswersWithTolerance(rawJsonString);
+            
+            if (answers) {
                 return {
                     type: 'clarification_answers',
                     stage: 2,
                     answers: answers
                 };
-            } catch (error) {
-                console.error('Failed to parse clarification answers:', error);
+            } else {
+                console.error('Failed to parse clarification answers after all attempts');
                 return null;
             }
         }
@@ -339,6 +341,82 @@ Provide a helpful response and indicate whether presentation generation should p
         return content;
     }
 
+    /**
+     * Parse clarification answers with error tolerance and automatic repair
+     * @param {string} rawJsonString - Raw JSON string from user message
+     * @returns {object|null} Parsed answers object or null if parsing fails
+     */
+    parseAnswersWithTolerance(rawJsonString) {
+        // Strategy 1: Try direct parsing first
+        try {
+            const answers = JSON.parse(rawJsonString);
+            console.log('[ConversationManager] JSON parsed successfully on first attempt');
+            return answers;
+        } catch (error) {
+            console.log('[ConversationManager] Direct JSON parsing failed, attempting repairs...');
+        }
+
+        // Strategy 2: Clean and repair common JSON issues
+        let cleanedJson = rawJsonString.trim();
+        
+        // Remove leading/trailing whitespace and quotes
+        if ((cleanedJson.startsWith('"') && cleanedJson.endsWith('"')) || 
+            (cleanedJson.startsWith("'") && cleanedJson.endsWith("'"))) {
+            cleanedJson = cleanedJson.slice(1, -1);
+        }
+
+        // Fix common issues:
+        // 1. Extra closing braces/commas at the end
+        cleanedJson = cleanedJson.replace(/[,}]+$/, '');
+        
+        // 2. Ensure proper closing brace
+        if (!cleanedJson.endsWith('}')) {
+            cleanedJson += '}';
+        }
+
+        // 3. Fix unescaped quotes in values (basic attempt)
+        cleanedJson = cleanedJson.replace(/: "([^"]*)"([^,}]*)"([^,}]*)/g, ': "$1\\"$2\\"$3');
+
+        try {
+            const answers = JSON.parse(cleanedJson);
+            console.log('[ConversationManager] JSON parsed successfully after cleaning');
+            return answers;
+        } catch (error) {
+            console.log('[ConversationManager] Cleaning failed, attempting regex extraction...');
+        }
+
+        // Strategy 3: Extract key-value pairs using regex (last resort)
+        try {
+            const answers = {};
+            
+            // Extract key-value pairs using regex
+            const keyValuePattern = /"([^"]+)":\s*("([^"]*)"|(true|false|\d+))/g;
+            let match;
+            
+            while ((match = keyValuePattern.exec(rawJsonString)) !== null) {
+                const key = match[1];
+                let value = match[3] || match[4]; // String value or boolean/number
+                
+                // Convert boolean and number strings
+                if (value === 'true') value = true;
+                else if (value === 'false') value = false;
+                else if (/^\d+$/.test(value)) value = parseInt(value);
+                
+                answers[key] = value;
+            }
+            
+            if (Object.keys(answers).length > 0) {
+                console.log('[ConversationManager] Successfully extracted key-value pairs using regex');
+                console.log('[ConversationManager] Extracted answers:', JSON.stringify(answers));
+                return answers;
+            }
+        } catch (error) {
+            console.log('[ConversationManager] Regex extraction failed:', error.message);
+        }
+
+        console.error('[ConversationManager] All parsing strategies failed for:', rawJsonString);
+        return null;
+    }
 
 }
 

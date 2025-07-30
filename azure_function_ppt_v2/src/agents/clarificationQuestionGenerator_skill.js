@@ -11,10 +11,10 @@ class ClarificationQuestionGenerator extends BaseAgent {
     }
 
     async process(input) {
-        const { conversation_content, conversation_history, requested_slide_count } = input;
+        const { conversation_content, conversation_history, requested_slide_count, document_content } = input;
 
-        if (!conversation_content) {
-            throw new Error('ClarificationQuestionGenerator requires conversation_content');
+        if (!conversation_content && !document_content) {
+            throw new Error('ClarificationQuestionGenerator requires conversation_content or document_content');
         }
 
         // If user specified slide count, use it (with bounds checking)
@@ -43,6 +43,7 @@ class ClarificationQuestionGenerator extends BaseAgent {
         // Create user prompt with content analysis
         const userPrompt = this.createCombinedUserPrompt({
             conversation_content,
+            document_content,
             conversation_history
         });
 
@@ -134,10 +135,10 @@ class ClarificationQuestionGenerator extends BaseAgent {
 - **Process/Procedure Content**: Focus on detail level, step-by-step vs overview
 
 ### Field Type Rules:
-- **select**: Dropdown with 3-5 predefined options
+- **select**: Dropdown with 3-5 predefined options + "Let agent decide" as fallback option
 - **boolean**: True/false questions for yes/no preferences
 - Each question must have 'required: true'
-- Select questions must have meaningful default_value
+- Select questions must include "Let agent decide" as the FIRST option and default_value
 - Boolean questions default to true or false based on common preference
 
 ## Output Format:
@@ -160,23 +161,30 @@ Return JSON with:
             "id": "unique_question_id",
             "question": "Clear question text with context",
             "field_type": "select" | "boolean",
-            "options": ["option1", "option2", "option3"], // for select only
+            "options": ["Let agent decide", "option1", "option2", "option3"], // for select only - ALWAYS include "Let agent decide" as first option
             "required": true,
-            "default_value": "default_option_or_boolean"
+            "default_value": "Let agent decide" // for select questions, "default_option_or_boolean" for boolean
         }
     ],
     "content_analysis": "Brief analysis of content type and detected themes"
 }`;
     }
 
-    createCombinedUserPrompt({ conversation_content, conversation_history }) {
-        return `Analyze this conversation content and perform BOTH slide estimation AND question generation:
+    createCombinedUserPrompt({ conversation_content, document_content, conversation_history }) {
+        let contentSection = '';
+        
+        if (conversation_content) {
+            contentSection += `## Conversation Content:\n${conversation_content}\n\n`;
+        }
+        
+        if (document_content) {
+            contentSection += `## Document Content:\n${document_content}\n\n`;
+        }
+        
+        return `Analyze this content and perform BOTH slide estimation AND question generation:
 
-## Conversation Content:
-${conversation_content}
-
-## Context:
-- Content source: Conversation history with user
+${contentSection}## Context:
+- Content source: ${conversation_content ? 'Conversation history' : ''}${document_content ? 'Document content' : ''}${conversation_content && document_content ? ' and document content' : ''}
 - Task: Provide both optimal slide count and relevant clarification questions
 
 ## Your Task:
@@ -189,15 +197,17 @@ ${conversation_content}
 
 **For Business Content:**
 - Slide Count: Consider strategic depth, implementation details, stakeholder levels
-- Questions: "What's your primary audience role?" (select: ["C-level executives", "Middle management", "Department teams", "Mixed audience"])
+- Questions: "What's your primary audience role?" (select: ["Let agent decide", "C-level executives", "Middle management", "Department teams", "Mixed audience"])
 
 **For Technical Content:**
 - Slide Count: Factor in technical complexity, code examples, implementation steps
-- Questions: "What's the technical expertise of your audience?" (select: ["Beginner", "Intermediate", "Advanced", "Mixed levels"])
+- Questions: "What's the technical expertise of your audience?" (select: ["Let agent decide", "Beginner", "Intermediate", "Advanced", "Mixed levels"])
 
 **For Educational Content:**
 - Slide Count: Consider learning objectives, exercise time, example complexity
-- Questions: "What's the primary learning objective?" (select: ["Awareness building", "Skill development", "Comprehensive training", "Quick reference"])
+- Questions: "What's the primary learning objective?" (select: ["Let agent decide", "Awareness building", "Skill development", "Comprehensive training", "Quick reference"])
+
+**IMPORTANT**: ALWAYS include "Let agent decide" as the FIRST option in ALL select questions and set it as the default_value. This allows users to defer decisions to the AI when uncertain.
 
 Perform both slide estimation and question generation in a single comprehensive analysis!`;
     }

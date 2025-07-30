@@ -89,16 +89,16 @@ const CONTENT_TYPES = {
 // ====================================================================
 
 const AGENT_PIPELINE = [
-    "ConversationManager",     // Handle conversation flow and context
-    "DocumentProcessor",       // Extract and organize document content
-    "SlideEstimator",         // Estimate slide count based on content
-    "ContentStructurer",      // Structure content for slides
-    "PptxGenerator"           // Generate PowerPoint using PptxGenJS
+    "ConversationManager",                 // Handle conversation flow and context
+    "DocumentProcessor",                   // Extract and organize document content
+    "ClarificationQuestionGenerator",      // Estimate slide count and generate questions
+    "ContentStructurer",                   // Structure content for slides
+    "PptxGenerator"                        // Generate PowerPoint using PptxGenJS
 ];
 
 const QUICK_RESPONSE_PIPELINE = [
-    "ConversationManager",     // Handle conversation only
-    "SlideEstimator"          // Provide slide count estimate
+    "ConversationManager",                 // Handle conversation only
+    "ClarificationQuestionGenerator"       // Provide slide count estimate and questions
 ];
 
 // ====================================================================
