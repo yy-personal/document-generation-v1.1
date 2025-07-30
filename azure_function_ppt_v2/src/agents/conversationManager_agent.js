@@ -13,7 +13,43 @@ class ConversationManager extends BaseAgent {
     async process(input) {
         this.validateInput(input, ['user_message']);
 
-        const { user_message, session_id, conversation_history = [], entra_id } = input;
+        const { user_message, session_id, conversation_history = [], entra_id, clarification_answers } = input;
+
+        // Special: Consolidate info trigger
+        if (user_message && user_message.trim().startsWith('[consolidate_info]')) {
+            // Build a prompt that asks the model to combine conversation history and clarification answers
+            const systemPrompt = `You are an expert assistant for a presentation generation service. Your task is to read the user's conversation history (Q&A pairs) and their clarified presentation preferences, and then produce a single, concise, human-readable summary that combines all relevant information. The summary should be suitable for a third-party agent to generate a PowerPoint presentation that matches the user's intent, context, and preferences. Do not simply list the Q&A and preferences separately—blend them into a unified, natural summary that covers the main topics, goals, audience, and any special requirements or examples requested.`;
+
+            // Build user prompt
+            let userPrompt = `## Conversation History:\n`;
+            if (Array.isArray(conversation_history) && conversation_history.length > 0 && conversation_history[0].conversation) {
+                conversation_history[0].conversation.forEach((conv, idx) => {
+                    userPrompt += `Q${idx + 1}: ${conv.question}\nA${idx + 1}: ${conv.response}\n`;
+                });
+            } else {
+                conversation_history.forEach((msg, idx) => {
+                    if (msg.role === 'user') userPrompt += `Q${idx + 1}: ${msg.content}\n`;
+                    if (msg.role === 'assistant') userPrompt += `A${idx + 1}: ${msg.content}\n`;
+                });
+            }
+            userPrompt += `\n## Clarified Presentation Preferences:\n`;
+            if (clarification_answers && typeof clarification_answers === 'object') {
+                Object.entries(clarification_answers).forEach(([key, value]) => {
+                    userPrompt += `- ${key}: ${value}\n`;
+                });
+            }
+
+            userPrompt += `\n## Task:\nWrite a single, well-structured summary that combines the above into a clear set of presentation requirements.`;
+
+            const messages = [
+                this.createSystemMessage(systemPrompt),
+                this.createUserMessage(userPrompt)
+            ];
+
+            const aiResponse = await this.callAI(messages);
+            // Return as { consolidated_summary: ... }
+            return { consolidated_summary: aiResponse.content };
+        }
 
         // Check for exact bracket triggers first
         const bracketTrigger = this.detectBracketTriggers(user_message);

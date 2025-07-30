@@ -238,11 +238,26 @@ class PowerPointOrchestrator {
                     ...this.extractAdditionalPreferences(clarificationAnswers)
                 };
 
+                // Use ConversationManager to generate a truly consolidated summary
+                const consolidationResult = await this.agents.ConversationManager.process({
+                    user_message: '[consolidate_info]',
+                    conversation_history: conversation_history,
+                    clarification_answers: clarificationAnswers
+                });
+                const consolidatedSummary = consolidationResult.consolidated_summary || this.createCombinedSummary(conversationResult.conversation_content, conversationResult.user_context, userPreferences);
+
                 // Prepare final consolidated information for third-party service
                 const consolidatedInfo = {
-                    // Combined summary: conversation topics + user preferences
-                    content_summary: this.createCombinedSummary(conversationResult.conversation_content, conversationResult.user_context, userPreferences),
-                    
+                    // Model-driven, unified summary
+                    content_summary: consolidatedSummary,
+
+                    // Rich context fields (for traceability/debugging)
+                    conversation_content: conversationResult.conversation_content || "",
+                    user_context: conversationResult.user_context || "",
+                    main_topics: this.extractMainTopics(this.extractOriginalConversation(conversation_history)),
+                    intent: conversationResult.intent || "",
+                    reasoning: conversationResult.reasoning || "",
+
                     // User's presentation preferences from clarification answers
                     user_preferences: userPreferences
                 };
