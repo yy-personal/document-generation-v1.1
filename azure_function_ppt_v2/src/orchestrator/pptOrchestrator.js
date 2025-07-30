@@ -6,7 +6,6 @@ const {
 
 // Import agents with updated naming convention
 const { ConversationManager } = require('../agents/conversationManager_agent');
-const { DocumentProcessor } = require('../agents/documentProcessor_skill');
 const { ClarificationQuestionGenerator } = require('../agents/clarificationQuestionGenerator_skill');
 const { ContentStructurer } = require('../agents/contentStructurer_skill');
 const { PptxGenerator } = require('../agents/pptxGenerator_skill');
@@ -15,7 +14,6 @@ class PowerPointOrchestrator {
     constructor() {
         this.agents = {
             ConversationManager: new ConversationManager(),
-            DocumentProcessor: new DocumentProcessor(),
             ClarificationQuestionGenerator: new ClarificationQuestionGenerator(),
             ContentStructurer: new ContentStructurer(),
             PptxGenerator: new PptxGenerator()
@@ -205,37 +203,11 @@ class PowerPointOrchestrator {
                 // Stage 2: Generate presentation with confirmed slide count
                 console.log('Stage 2: Generating presentation with user-confirmed slide count');
 
-                if (!hasDocumentContent && !hasConversationContent) {
-                    throw new Error('Cannot generate presentation without document content or conversation content');
+                if (!hasConversationContent) {
+                    throw new Error('Cannot generate presentation without conversation content');
                 }
 
-                // Step 2: Content Processing
-                console.log('Step 2: Processing content');
-                const processingInput = {
-                    user_context: conversationResult.user_context,
-                    content_source: contentSource
-                };
-
-                // Add clarification answers if provided
-                if (clarificationAnswers) {
-                    processingInput.clarification_answers = clarificationAnswers;
-                    console.log('Using clarification answers for content processing');
-                }
-
-                if (hasDocumentContent) {
-                    processingInput.document_content = conversationResult.document_content;
-                }
-
-                if (hasConversationContent) {
-                    processingInput.conversation_content = conversationResult.conversation_content;
-                }
-
-                const documentResult = await this.agents.DocumentProcessor.process(processingInput);
-
-                response.response_data.pipeline_info.push('DocumentProcessor');
-                response.response_data.processing_info.document_analysis = documentResult;
-
-                // Step 3: Slide Estimation (or use user's choice)
+                // Step 2: Slide Estimation (or use user's choice)
                 let slideEstimate;
                 
                 if (clarificationAnswers && clarificationAnswers.slide_count) {
@@ -275,12 +247,13 @@ class PowerPointOrchestrator {
 
                 response.response_data.processing_info.slide_estimate = slideEstimate;
 
-                // Step 4: Content Structuring
-                console.log('Step 4: Structuring content for slides');
+                // Step 3: Content Structuring
+                console.log('Step 3: Structuring content for slides');
                 const structuringInput = {
-                    processed_content: documentResult,
+                    conversation_content: conversationResult.conversation_content,
                     slide_estimate: slideEstimate,
-                    user_context: conversationResult.user_context
+                    user_context: conversationResult.user_context,
+                    content_source: 'conversation'
                 };
 
                 // Add clarification answers for content structuring
@@ -293,8 +266,8 @@ class PowerPointOrchestrator {
                 response.response_data.pipeline_info.push('ContentStructurer');
                 response.response_data.processing_info.content_structure = structuredContent;
 
-                // Step 5: PowerPoint Generation
-                console.log('Step 5: Generating PowerPoint file');
+                // Step 4: PowerPoint Generation
+                console.log('Step 4: Generating PowerPoint file');
                 const pptxResult = await this.agents.PptxGenerator.process({
                     structured_content: structuredContent,
                     slide_estimate: slideEstimate,

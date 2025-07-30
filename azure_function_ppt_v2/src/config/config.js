@@ -90,7 +90,6 @@ const CONTENT_TYPES = {
 
 const AGENT_PIPELINE = [
     "ConversationManager",                 // Handle conversation flow and context
-    "DocumentProcessor",                   // Extract and organize document content
     "ClarificationQuestionGenerator",      // Estimate slide count and generate questions
     "ContentStructurer",                   // Structure content for slides
     "PptxGenerator"                        // Generate PowerPoint using PptxGenJS
@@ -110,12 +109,6 @@ const AGENT_CONFIGS = {
         max_tokens: 20000,
         temperature: 0.3,
         purpose: "Manage conversation flow, understand user intent, and maintain context"
-    },
-    
-    DocumentProcessor: {
-        max_tokens: 8000,
-        temperature: 0.4,
-        purpose: "Extract and organize content from documents for presentation structure"
     },
     
     ClarificationQuestionGenerator: {
@@ -193,7 +186,7 @@ const PPTX_CONFIG = {
 // ====================================================================
 
 const getAgentConfig = (agentName) => {
-    return AGENT_CONFIGS[agentName] || AGENT_CONFIGS.DocumentProcessor;
+    return AGENT_CONFIGS[agentName] || AGENT_CONFIGS.ContentStructurer;
 };
 
 const generateSessionId = () => {

@@ -11,18 +11,29 @@ class ContentStructurer extends BaseAgent {
     }
 
     async process(input) {
-        this.validateInput(input, ['processed_content', 'slide_estimate']);
+        // Accept either processed_content (legacy) or conversation_content (new)
+        const { processed_content, conversation_content, slide_estimate, user_context, clarification_answers } = input;
+        
+        if (!processed_content && !conversation_content) {
+            throw new Error('ContentStructurer requires either processed_content or conversation_content');
+        }
+        
+        if (!slide_estimate) {
+            throw new Error('ContentStructurer requires slide_estimate');
+        }
 
-        const { processed_content, slide_estimate, user_context } = input;
+        // Use conversation_content if available, otherwise fall back to processed_content
+        const content = conversation_content || processed_content;
 
         // Create system prompt for content structuring
         const systemPrompt = this.createContentStructuringSystemPrompt();
 
         // Create user prompt
         const userPrompt = this.createContentStructuringUserPrompt({
-            processed_content,
+            content,
             slide_estimate,
-            user_context
+            user_context,
+            clarification_answers
         });
 
         const messages = [
@@ -117,19 +128,37 @@ Return JSON with:
 Create engaging, professional slide structures that effectively communicate the content.`;
     }
 
-    createContentStructuringUserPrompt({ processed_content, slide_estimate, user_context }) {
+    createContentStructuringUserPrompt({ content, slide_estimate, user_context, clarification_answers }) {
+        // Handle both processed content (structured) and conversation content (raw text)
+        const isProcessedContent = content && typeof content === 'object' && content.main_topics;
+        const processed_content = isProcessedContent ? content : null;
+        const conversation_content = !isProcessedContent ? content : null;
         let prompt = `## Content Structuring Task:
 
 Create a detailed slide-by-slide structure for a ${slide_estimate.estimated_slides}-slide PowerPoint presentation.
 
-## Processed Content:
+## Slide Estimation Details:
+- Estimated Slides: ${slide_estimate.estimated_slides}
+- Content Complexity: ${slide_estimate.content_complexity}
+- Reasoning: ${slide_estimate.reasoning || 'AI analysis'}`;
+
+        // Add clarification answers if provided
+        if (clarification_answers) {
+            prompt += `\n\n## User Preferences:`;
+            Object.entries(clarification_answers).forEach(([key, value]) => {
+                prompt += `\n- ${key}: ${value}`;
+            });
+        }
+
+        if (processed_content && processed_content.main_topics) {
+            // Handle structured processed content (legacy)
+            prompt += `\n\n## Processed Content:
 Document Type: ${processed_content.document_type}
 Content Complexity: ${processed_content.content_complexity}
 Executive Summary: ${processed_content.executive_summary}
 
-## Main Topics (${processed_content.main_topics?.length || 0} topics):`;
+## Main Topics (${processed_content.main_topics.length} topics):`;
 
-        if (processed_content.main_topics) {
             processed_content.main_topics.forEach((topic, index) => {
                 prompt += `\n\n${index + 1}. **${topic.topic}** (${topic.importance} importance)
    - Content Type: ${topic.content_type}
@@ -137,22 +166,26 @@ Executive Summary: ${processed_content.executive_summary}
    - Supporting Details: ${topic.supporting_details?.join(', ') || 'None'}
    - Estimated Slides: ${topic.estimated_slides || 1}`;
             });
-        }
 
-        if (processed_content.special_content) {
-            prompt += `\n\n## Special Content:`;
-            
-            if (processed_content.special_content.tables?.length > 0) {
-                prompt += `\n- Tables: ${processed_content.special_content.tables.join('; ')}`;
+            if (processed_content.special_content) {
+                prompt += `\n\n## Special Content:`;
+                
+                if (processed_content.special_content.tables?.length > 0) {
+                    prompt += `\n- Tables: ${processed_content.special_content.tables.join('; ')}`;
+                }
+                
+                if (processed_content.special_content.procedures?.length > 0) {
+                    prompt += `\n- Procedures: ${processed_content.special_content.procedures.join('; ')}`;
+                }
+                
+                if (processed_content.special_content.data_points?.length > 0) {
+                    prompt += `\n- Key Data: ${processed_content.special_content.data_points.join('; ')}`;
+                }
             }
-            
-            if (processed_content.special_content.procedures?.length > 0) {
-                prompt += `\n- Procedures: ${processed_content.special_content.procedures.join('; ')}`;
-            }
-            
-            if (processed_content.special_content.data_points?.length > 0) {
-                prompt += `\n- Key Data: ${processed_content.special_content.data_points.join('; ')}`;
-            }
+        } else if (conversation_content) {
+            // Handle raw conversation content (new)
+            prompt += `\n\n## Conversation Content:
+${conversation_content}`;
         }
 
         if (user_context && user_context.trim()) {
