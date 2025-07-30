@@ -223,14 +223,10 @@ class PowerPointOrchestrator {
                     finalSlideCount = parseInt(requestedSlideCount);
                 }
 
-                // Prepare user preferences object
+                // Prepare user preferences object - only include what user actually provided
                 const userPreferences = {
                     slide_count: finalSlideCount,
-                    audience_level: clarificationAnswers.audience_level || clarificationAnswers.audience_level_select || 'General',
-                    content_depth: clarificationAnswers.content_depth || 'Moderate detail',
-                    content_focus: clarificationAnswers.content_focus || clarificationAnswers.content_focus_select || 'Balanced coverage',
-                    include_examples: clarificationAnswers.include_examples || clarificationAnswers.include_examples_boolean || false,
-                    ...this.extractAdditionalPreferences(clarificationAnswers)
+                    ...this.extractAllUserPreferences(clarificationAnswers)
                 };
 
                 // Use ConversationManager to generate a unified content_summary
@@ -347,14 +343,13 @@ class PowerPointOrchestrator {
         }
     }
 
-    // Helper method to extract additional preferences from clarification answers
-    extractAdditionalPreferences(clarificationAnswers) {
+    // Helper method to extract all user preferences without defaults
+    extractAllUserPreferences(clarificationAnswers) {
         const preferences = {};
         
-        // Extract any preferences not already captured in main config
+        // Extract ALL preferences that user actually provided (no defaults)
         Object.keys(clarificationAnswers || {}).forEach(key => {
-            if (!['slide_count', 'audience_level', 'audience_level_select', 'content_depth', 
-                  'content_focus', 'content_focus_select', 'include_examples', 'include_examples_boolean'].includes(key)) {
+            if (key !== 'slide_count') { // slide_count handled separately
                 preferences[key] = clarificationAnswers[key];
             }
         });
