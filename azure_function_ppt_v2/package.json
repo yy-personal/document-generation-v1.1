@@ -1,16 +1,18 @@
 {
   "name": "powerpoint-generation-v2",
   "version": "1.0.0",
-  "description": "PowerPoint Generation Service v2 using PptxGenJS",
+  "description": "PowerPoint Requirements Service v2 - Intelligent presentation requirements preprocessing",
   "scripts": {
     "start": "npx func start --port 7076",
-    "restart": "start.bat",
+    "restart": "npm run kill-port && npm start",
+    "kill-port": "npx kill-port 7076",
     "func": "npx func"
   },
   "dependencies": {
     "@azure/functions": "^4.0.0",
     "openai": "^4.0.0",
-    "dotenv": "^16.0.0"
+    "dotenv": "^16.0.0",
+    "kill-port": "^2.0.1"
   },
   "devDependencies": {
     "azure-functions-core-tools": "^4.0.0"

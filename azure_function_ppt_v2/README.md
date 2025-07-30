@@ -1,18 +1,18 @@
-# Presentation Planning Service v2
+# PowerPoint Requirements Service v2
 
-Conversational presentation requirements gathering service for third-party PowerPoint generation integration.
+Intelligent presentation requirements preprocessing service for third-party PowerPoint generation integration.
 
 ## Overview
 
-This Node.js Azure Function provides a conversational interface for gathering presentation requirements through a 2-stage clarification workflow. It analyzes conversation history to generate contextual questions and consolidated information for third-party PowerPoint generation services.
+This Node.js Azure Function acts as an **intelligent preprocessing layer** that transforms conversational content into structured presentation requirements. It uses a 2-stage clarification workflow to gather user preferences and outputs comprehensive `consolidated_info` for third-party PowerPoint generation services.
 
 ### Current Implementation Status
 
 **Conversational Interface** - COMPLETE - Multi-turn conversations with session management  
 **Smart Slide Estimation** - COMPLETE - AI-powered slide count recommendation (3-60 slides)  
 **Clarification Questions** - COMPLETE - Context-aware questions with "Let agent decide" options  
-**Consolidated Information** - COMPLETE - Structured output for third-party PowerPoint services  
-**Requirements Gathering** - COMPLETE - 2-stage workflow for presentation customization
+**Consolidated Information** - COMPLETE - Structured `consolidated_info` output for third-party PowerPoint services  
+**Requirements Preprocessing** - COMPLETE - 2-stage workflow transforming conversations into structured requirements
 
 ## Quick Start
 
@@ -54,11 +54,11 @@ ConversationManager → ClarificationQuestionGenerator
    Context Building           Consolidated Information
 ```
 
-### Clarification Workflow
+### Requirements Preprocessing Workflow
 1. **Context Building** - User discusses presentation needs through conversation
-2. **Create Trigger** - User sends `[create_presentation]` to start workflow
-3. **Clarification Questions** - System generates up to 5 contextual questions with AI recommendations
-4. **Requirements Processing** - User answers are processed into consolidated information for third-party services
+2. **Auto-Trigger** - Conversation history automatically triggers clarification workflow
+3. **Clarification Questions** - System generates 3-4 contextual questions with AI slide recommendations
+4. **Requirements Consolidation** - User answers are processed into structured `consolidated_info` for third-party PowerPoint generation services
 
 ## API Usage
 
@@ -69,15 +69,15 @@ POST /api/powerpointGeneration
 
 ### Workflow Example
 ```json
-// Stage 1: Request clarification questions
+// Stage 1: Auto-trigger clarification questions (conversation history provided)
 {
-  "user_message": "[create_presentation]",
+  "user_message": "{\"session_id\": \"abc-123\", \"conversation\": [{\"question\": \"Tell me about stock market\", \"response\": \"Stock market involves...\"}]}",
   "session_id": "PPTV2...",
   "conversation_history": [
     {
       "session_id": "PPTV2...",
       "conversation": [
-        {"question": "Tell me about robotics in workplace", "response": "Robotics involves..."}
+        {"question": "Tell me about stock market", "response": "Stock market involves..."}
       ]
     }
   ],
@@ -86,7 +86,7 @@ POST /api/powerpointGeneration
 
 // Stage 2: Submit clarification answers
 {
-  "user_message": "[clarification_answers]{\"slide_count\": 15, \"audience_level\": \"Advanced\", \"include_examples\": true}",
+  "user_message": "[clarification_answers]{\"slide_count\": 12, \"audience_level\": \"Intermediate\", \"include_examples\": true, \"content_depth\": \"Moderate detail\"}",
   "session_id": "PPTV2...",
   "conversation_history": [...],
   "entra_id": "user-123"
@@ -129,9 +129,9 @@ PRESENTATION_CONFIG = {
 
 ### Port Management
 If port 7076 is in use:
-- **Recommended**: `npm run restart` (auto-kills existing processes)
-- **Manual**: Use `netstat -ano | findstr :7076` then `taskkill /PID <PID> /F`
-- **Change port**: Update both `config.js` (line 157) and `package.json` (line 6)
+- **Recommended**: `npm run restart` (auto-kills existing processes using kill-port)
+- **Manual**: Use `npm run kill-port` or `npx kill-port 7076`
+- **Change port**: Update both `config.js` and `package.json` scripts
 
 ## Current Status
 
@@ -150,10 +150,10 @@ If port 7076 is in use:
 ### Functional Capabilities (Current)
 - Process conversation history to understand presentation context
 - Generate AI-powered slide count recommendations based on content complexity
-- Create contextual clarification questions (max 5) with field types: select, boolean, number
+- Create contextual clarification questions (3-4 questions) with field types: select, boolean only
 - Provide "Let agent decide" options for all select questions as default
 - Process user clarification answers with tolerant JSON parsing
-- Output consolidated presentation requirements for third-party services
+- Output structured `consolidated_info` with detailed content summary for third-party services
 - Maintain session context across 2-stage workflow
 
 ### Integration Ready
@@ -198,7 +198,8 @@ azure_function_ppt_v2/
       {
         "id": "slide_count",
         "question": "How many slides would you like? (Recommended: 12 slides based on AI analysis)",
-        "field_type": "number",
+        "field_type": "select",
+        "options": [6, 9, 12, 15, 18, 21],
         "default_value": 12,
         "validation": {"min": 3, "max": 60}
       },
@@ -214,29 +215,27 @@ azure_function_ppt_v2/
 }
 ```
 
-### Stage 2: Consolidated Information
+### Stage 2: Consolidated Requirements
 ```json
 {
   "response_data": {
+    "status": "completed",
     "consolidated_info": {
-      "conversation_content": "Discussion about robotics in workplace...",
-      "user_context": "User wants comprehensive overview",
-      "content_source": "conversation",
-      "slide_count": 15,
+      "content_summary": "The presentation will provide an intermediate-level, moderately detailed overview of the stock market, with balanced coverage of both general stock market fundamentals and notable figures in stock market prediction...\n\n**Presentation Structure and Content Requirements:**\n\n1. **Title Slide**\n   - Title: \"Understanding the Stock Market and Its Legendary Predictors\"\n   - Layout: 1_title_slide\n   - Placeholders: Presenter name, date, relevant image",
       "user_preferences": {
-        "slide_count": 15,
-        "audience_level": "Advanced",
+        "slide_count": 12,
+        "audience_level": "Intermediate",
+        "content_depth": "Moderate detail",
         "include_examples": true
       },
-      "session_id": "PPTV2...",
-      "entra_id": "user-123",
-      "processed_timestamp": "2025-01-XX...",
-      "service_version": "v2.1"
-    }
+      "main_topics": [...],
+      "intent": "PRESENTATION_GENERATE"
+    },
+    "powerpoint_output": null
   }
 }
 ```
 
 ---
 
-**Presentation Planning Service v2** - Complete 2-stage clarification workflow for third-party PowerPoint generation
+**PowerPoint Requirements Service v2** - Complete 2-stage requirements preprocessing workflow for third-party PowerPoint generation services
