@@ -9,8 +9,8 @@ This Node.js Azure Function acts as an **intelligent preprocessing layer** that 
 ### Current Implementation Status
 
 **Conversational Interface** - COMPLETE - Multi-turn conversations with session management  
-**Smart Slide Estimation** - COMPLETE - AI-powered slide count recommendation (3-60 slides)  
-**Clarification Questions** - COMPLETE - Context-aware questions with "Let agent decide" options  
+**Smart Slide Estimation** - COMPLETE - AI-powered slide count recommendation (3-60 slides) with 11 options around recommendation  
+**Clarification Questions** - COMPLETE - Dynamic contextual questions (not hardcoded) with "Let agent decide" options  
 **Consolidated Information** - COMPLETE - Structured `consolidated_info` output for third-party PowerPoint services  
 **Requirements Preprocessing** - COMPLETE - 2-stage workflow transforming conversations into structured requirements
 
@@ -158,8 +158,8 @@ If port 7076 is in use:
 
 ### Functional Capabilities (Current)
 - Process conversation history to understand presentation context
-- Generate AI-powered slide count recommendations based on content complexity
-- Create contextual clarification questions (3-4 questions) with field types: select, boolean only
+- Generate AI-powered slide count recommendations based on content complexity (11 options around recommendation)
+- Create dynamic contextual clarification questions (2-4 questions) based on conversation content - only 1 mandatory slide_count question, others contextual with field types: select, boolean only
 - Provide "Let agent decide" options for all select questions as default
 - Process user clarification answers with tolerant JSON parsing
 - Output structured `consolidated_info` with detailed content summary for third-party services
@@ -167,11 +167,12 @@ If port 7076 is in use:
 
 ### Integration Ready
 - [x] **Third-Party Service Integration** - Consolidated information output format ready
-- [x] **Question Generation** - Contextual questions based on conversation analysis
-- [x] **Slide Recommendations** - AI-powered slide count estimation with ranges
+- [x] **Dynamic Question Generation** - AI-generated contextual questions based on conversation analysis (no hardcoded questions)
+- [x] **Slide Recommendations** - AI-powered slide count estimation with 11 options around recommendation
 - [x] **User Preferences** - Structured clarification answers processing
 - [x] **Error Handling** - Tolerant parsing for frontend integration
 - [x] **Centralized Prompt Management** - All system prompts stored in external .txt files
+- [x] **Text-Only Output** - Optimized for PowerPoint generators supporting text, bullet points, and tables only (no visual elements, images, or illustrations)
 
 ## Project Structure
 ```
@@ -227,6 +228,22 @@ const systemPrompt = promptLoader.loadPrompt('conversation_manager_system');
 
 See `src/prompts/README.md` for detailed documentation on the prompt management system.
 
+## PowerPoint Generator Constraints
+
+The third-party PowerPoint generation service supports **text-only content** with the following capabilities:
+
+### Supported Content Types
+- **Text content** - Titles, body text, descriptions
+- **Bullet points** - Structured lists and hierarchical information
+- **Tables** - Data presentation in tabular format
+
+### Not Supported (Constraints)
+- **Visual elements** - No images, charts, graphs, or illustrations
+- **Media content** - No videos, audio, or interactive elements
+- **Complex layouts** - Limited to predefined template layouts
+
+The system is designed to generate content that works optimally within these constraints, ensuring compatibility with the PowerPoint generation service.
+
 ## Output Format
 
 ### Stage 1: Clarification Questions
@@ -239,7 +256,7 @@ See `src/prompts/README.md` for detailed documentation on the prompt management 
         "id": "slide_count",
         "question": "How many slides would you like? (Recommended: 12 slides based on AI analysis)",
         "field_type": "select",
-        "options": [6, 9, 12, 15, 18, 21],
+        "options": [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 36],
         "default_value": 12,
         "validation": {"min": 3, "max": 60}
       },

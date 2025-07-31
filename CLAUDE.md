@@ -61,7 +61,7 @@ Each service can be tested independently:
 - **Pipeline**: 2-stage clarification workflow with 2 AI agents
 - **Output**: Structured presentation requirements (`consolidated_info`) for third-party PowerPoint generators
 - **Processing time**: 8-12 seconds (Stage 1: 2-3s, Stage 2: 6-9s)
-- **Key Feature**: AI-powered slide estimation and contextual clarification questions
+- **Key Feature**: AI-powered slide estimation and dynamic contextual clarification questions (no hardcoded questions)
 - **Technology**: Node.js with intelligent requirements preprocessing and centralized prompt management
 - **Integration**: Feeds processed requirements to third-party PowerPoint generation services
 - **Status**: Production ready as preprocessing service for PowerPoint generators
@@ -69,7 +69,7 @@ Each service can be tested independently:
 ## Key Configuration Files
 
 ### Azure Functions Configuration
-- `config.py` - Agent settings, token limits, slide configurations, pipeline definitions
+- `config.js` - Agent settings, token limits, slide configurations, pipeline definitions (Node.js)
 - `local.settings.json` - Local environment variables (git ignored)
 - `host.json` - Azure Functions host configuration
 - `.env` - Environment variables in parent directory (git ignored)
@@ -187,22 +187,32 @@ Both services use Semantic Kernel with specialized agents operating in sequentia
 
 ## PowerPoint Requirements v2 Clarification Questions Workflow
 
-### Smart Question Generation (3-4 Questions + Slide Count)
+### Dynamic Question Generation (2-4 Questions + Slide Count)
 
-The system generates contextual questions based on conversation analysis:
+The system generates contextual questions dynamically based on conversation analysis:
 
 **Always Included:**
-1. **Slide Count** - Select field with AI recommendation and range options
-2. **Audience Level** - Select: "Let agent decide"/Beginner/Intermediate/Advanced/Mixed audience  
-3. **Include Examples** - Boolean for detailed examples and case studies
+1. **Slide Count** - Select field with AI recommendation and 11 options (±15 slides around recommendation)
 
-**Context-Dependent Questions (1-2 additional):**
-- **Content Focus** - Adaptive based on content type detection
-- **Content Depth** - Level of detail preference based on detected complexity
+**Dynamically Generated (2-4 questions based on content):**
+- **Audience Expertise** - ONLY if content has technical/complex concepts
+- **Content Focus** - ONLY if conversation covers multiple distinct topics  
+- **Detail Level** - ONLY if content could be presented at different depths
+- **Include Written Examples** - ONLY if content involves concepts needing illustration
+- **Content Organization** - ONLY if content could be structured differently
+
+**No Hardcoded Questions:** All questions except slide_count are AI-generated based on specific conversation content.
 
 ### Question Field Types (Supported)
 - `select` - Dropdown with predefined options (always includes "Let agent decide" as first option)
 - `boolean` - True/false toggle for yes/no questions
+
+### Text-Only PowerPoint Constraints
+The system is optimized for PowerPoint generators that support:
+- **Text content only** - No images, charts, graphs, or visual elements
+- **Bullet points** - Structured text organization
+- **Tables** - Text-based data presentation
+- **No visual suggestions** - Questions and consolidation avoid referencing visual elements
 
 ### AI Slide Recommendation Logic
 The ClarificationQuestionGenerator analyzes conversation content to recommend optimal slide count:
