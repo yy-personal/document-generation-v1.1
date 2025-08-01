@@ -193,14 +193,6 @@ Provide a helpful response and indicate whether presentation generation should p
         // Normalize the message by trimming whitespace
         const normalizedMessage = userMessage.trim();
 
-        // Stage 1: [create_presentation]
-        if (normalizedMessage.includes('[create_presentation]')) {
-            return {
-                type: 'create_presentation',
-                stage: 1
-            };
-        }
-
         // Stage 2: [clarification_answers]{JSON_answers}
         const answersMatch = normalizedMessage.match(/\[clarification_answers\](.+)/);
         if (answersMatch) {
@@ -230,24 +222,6 @@ Provide a helpful response and indicate whether presentation generation should p
      */
     handleBracketTrigger(trigger, input) {
         const { conversation_history = [] } = input;
-
-        if (trigger.type === 'create_presentation') {
-            // Stage 1: Need AI slide estimation first, then generate questions
-            return {
-                intent: "PRESENTATION_INITIATE",
-                should_generate_presentation: false,
-                show_clarification_questions: true,
-                need_slide_estimation: true, // Flag to call SlideEstimator first
-                user_context: "User clicked Create Presentation button",
-                conversation_content: this.extractConversationContent(conversation_history),
-                content_source: "conversation",
-                response_text: "Analyzing your content to recommend optimal slide count...",
-                confidence: 1.0,
-                reasoning: "Frontend create presentation button triggered - need AI slide estimation",
-                requested_slide_count: null,
-                has_document_content: false
-            };
-        }
 
         if (trigger.type === 'clarification_answers') {
             // Stage 2: Return generation request with clarification answers
@@ -411,7 +385,6 @@ Provide a helpful response and indicate whether presentation generation should p
             console.warn('[ConversationManager] Using fallback response structure');
             return {
                 should_generate_presentation: false,
-                show_slide_recommendation: false,
                 show_clarification_questions: false,
                 need_slide_estimation: false,
                 clarification_answers: null,

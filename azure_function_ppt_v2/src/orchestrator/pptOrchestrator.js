@@ -43,7 +43,6 @@ class PowerPointOrchestrator {
                     session_id: sessionId,
                     conversation_history: conversation_history,
                     response_text: '',
-                    powerpoint_output: null,
                     // Keep minimal processing info for debugging only
                     processing_info: {}
                 }
@@ -74,7 +73,6 @@ class PowerPointOrchestrator {
 
             // Determine workflow stage
             const shouldGeneratePresentation = conversationResult.should_generate_presentation;
-            const showSlideRecommendation = conversationResult.show_slide_recommendation;
             const showClarificationQuestions = conversationResult.show_clarification_questions;
             const needSlideEstimation = conversationResult.need_slide_estimation;
             const clarificationAnswers = conversationResult.clarification_answers;
@@ -129,58 +127,6 @@ class PowerPointOrchestrator {
                 response.response_data.status = 'completed';
                 return response;
                 
-            } else if (showClarificationQuestions) {
-                // Legacy: Direct clarification questions (shouldn't happen with new flow)
-                console.log('Stage 1: Direct clarification questions (legacy)');
-                
-                response.response_data.show_clarification_popup = true;
-                response.response_data.clarification_questions = conversationResult.clarification_questions;
-                response.response_data.response_text = conversationResult.response_text;
-                
-                // Add assistant response to history
-                updatedHistory.push({
-                    role: 'assistant',
-                    content: conversationResult.response_text,
-                    timestamp: new Date().toISOString()
-                });
-
-                response.response_data.conversation_history = updatedHistory;
-                response.response_data.status = 'completed';
-                return response;
-                
-            } else if (showSlideRecommendation) {
-                // Legacy: Show slide recommendation (frontend will show popup)
-                console.log('Stage 1: Providing slide recommendation for popup');
-                
-                if (hasDocumentContent || hasConversationContent) {
-                    const slideEstimateInput = {
-                        conversation_content: conversationResult.conversation_content,
-                        conversation_history: conversation_history,
-                        requested_slide_count: conversationResult.requested_slide_count
-                    };
-                    
-                    // Add document content if available
-                    if (hasDocumentContent) {
-                        slideEstimateInput.document_content = conversationResult.document_content;
-                    }
-
-                    const clarificationResult = await this.agents.ClarificationQuestionGenerator.process(slideEstimateInput);
-                    
-                    const slideEstimate = {
-                        estimated_slides: clarificationResult.estimated_slides,
-                        content_complexity: clarificationResult.content_complexity,
-                        reasoning: clarificationResult.reasoning,
-                        confidence: clarificationResult.confidence,
-                        user_specified: clarificationResult.user_specified
-                    };
-                    
-                    response.response_data.processing_info.slide_estimate = slideEstimate;
-                    response.response_data.show_slide_popup = true;
-                    response.response_data.recommended_slides = slideEstimate.estimated_slides;
-                    response.response_data.response_text = `Ready to create presentation! I recommend ${slideEstimate.estimated_slides} slides based on your conversation content.`;
-                } else {
-                    throw new Error('Cannot recommend slides without content');
-                }
             } else if (!shouldGeneratePresentation) {
                 // Regular conversation - no presentation workflow
                 console.log('Regular conversation mode');

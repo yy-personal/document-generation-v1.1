@@ -48,7 +48,7 @@ curl https://fnncsgptpptagent-v2.azurewebsites.net/api/powerpointGeneration
 curl -X POST https://fnncsgptpptagent-v2.azurewebsites.net/api/powerpointGeneration \
   -H "Content-Type: application/json" \
   -d '{
-    "user_message": "[create_presentation]",
+    "user_message": "{\"session_id\": \"test-session-123\", \"conversation\": [{\"question\": \"Tell me about AI in business\", \"response\": \"AI transforms business operations...\"}]}",
     "entra_id": "test-user",
     "session_id": "test-session-123",
     "conversation_history": [
@@ -98,10 +98,14 @@ curl -X POST https://fnncsgptpptagent-v2.azurewebsites.net/api/powerpointGenerat
 ```json
 {
   "response_data": {
-    "powerpoint_output": {
-      "filename": "presentation_PPTV2...pptx",
-      "file_data": "base64_encoded_pptx_file",
-      "file_size_kb": 1234
+    "status": "completed",
+    "consolidated_info": {
+      "content_summary": "Detailed presentation requirements...",
+      "user_preferences": {
+        "slide_count": 10,
+        "audience_level": "Intermediate", 
+        "include_examples": true
+      }
     }
   }
 }
@@ -147,7 +151,7 @@ func azure functionapp logstream fnncsgptpptagent-v2
 - **AI Efficiency**: Single SlideEstimator call, user choice respected
 
 ### Bracket Notation Triggers
-- `[create_presentation]` → Triggers clarification questions
+- Conversation history auto-triggers clarification questions
 - `[clarification_answers]{JSON}` → Triggers presentation generation
 - Exact matching prevents AI misinterpretation
 
