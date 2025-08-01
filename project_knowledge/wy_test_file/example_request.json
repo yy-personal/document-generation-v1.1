@@ -1,0 +1,93 @@
+{
+  "message": [
+    [
+      {
+        "content_type": "text",
+        "text": "Create a presentation about artificial intelligence and machine learning for a business audience. Include the current state of AI, practical applications in different industries, implementation challenges, and future trends."
+      }
+    ]
+  ],
+  "history": [
+    {
+      "ai_model_id": "gpt-4",
+      "metadata": {},
+      "content_type": "text",
+      "role": "user",
+      "name": "user",
+      "items": [
+        {
+          "content_type": "text",
+          "text": "I need to present to our executive team about AI adoption strategies"
+        }
+      ],
+      "encoding": "utf-8",
+      "finish_reason": "stop",
+      "status": "completed"
+    },
+    {
+      "ai_model_id": "gpt-4",
+      "metadata": {},
+      "content_type": "text", 
+      "role": "assistant",
+      "name": "assistant",
+      "items": [
+        {
+          "content_type": "text",
+          "text": "I'll help you create a comprehensive AI presentation for your executive team. This should cover strategic aspects, business value, implementation considerations, and competitive advantages. What specific industries or use cases are most relevant to your organization?"
+        }
+      ],
+      "encoding": "utf-8",
+      "finish_reason": "stop", 
+      "status": "completed"
+    },
+    {
+      "ai_model_id": "gpt-4",
+      "metadata": {},
+      "content_type": "text",
+      "role": "user", 
+      "name": "user",
+      "items": [
+        {
+          "content_type": "text",
+          "text": "We're in financial services, particularly focused on customer experience and risk management"
+        }
+      ],
+      "encoding": "utf-8",
+      "finish_reason": "stop",
+      "status": "completed"
+    },
+    {
+      "ai_model_id": "gpt-4",
+      "metadata": {},
+      "content_type": "text",
+      "role": "assistant",
+      "name": "assistant", 
+      "items": [
+        {
+          "content_type": "text",
+          "text": "Perfect! For financial services, AI has tremendous potential in customer experience and risk management. Key areas include:\n\n**Customer Experience:**\n- Personalized product recommendations\n- Intelligent chatbots for 24/7 support\n- Fraud detection and prevention\n- Automated loan processing\n- Predictive customer service\n\n**Risk Management:**\n- Credit scoring and underwriting\n- Market risk analysis\n- Regulatory compliance monitoring\n- Anti-money laundering (AML)\n- Real-time transaction monitoring\n\nI'll structure your presentation to highlight these financial services applications along with ROI potential and implementation roadmaps."
+        }
+      ],
+      "encoding": "utf-8",
+      "finish_reason": "stop",
+      "status": "completed"
+    }
+  ],
+  "config": {
+    "web_search": {
+      "webSearchRestrictions": {
+        "isWebSearchAllowed": false
+      },
+      "userIntent": {
+        "explicitWebSearchRequested": false
+      }
+    },
+    "expert_routing": {
+      "expertNames": [],
+      "forceRoute": false
+    },
+    "memory": {
+      "user_id": "exec_user"
+    }
+  }
+}
