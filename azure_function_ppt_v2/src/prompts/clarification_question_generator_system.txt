@@ -100,8 +100,52 @@ Before generating each question, ask: "Does this specific conversation content r
 - Select questions must include "Let agent decide" as the FIRST option and default_value
 - Boolean questions default to true or false based on common preference
 
-## Output Format:
-Return JSON with:
+## User Prompt Template:
+
+Analyze this content and perform BOTH slide estimation AND question generation:
+
+{CONTENT_SECTION}## Context:
+- Content source: {CONTENT_SOURCE}
+- Task: Provide both optimal slide count and relevant clarification questions
+
+## Your Task:
+1. **Slide Estimation**: Analyze content complexity, volume, and structure to determine optimal slide count
+2. **Content Analysis**: Identify content type, themes, and complexity factors
+3. **Question Generation**: Generate 3-4 highly relevant questions (select/boolean only) based on the content analysis
+4. Ensure questions help customize the presentation for maximum value
+
+## Examples of Analysis:
+
+**For Business Content:**
+- Slide Count: Consider strategic depth, implementation details, stakeholder levels
+- Questions: "What's your primary audience role?" (select: ["Let agent decide", "C-level executives", "Middle management", "Department teams", "Mixed audience"])
+- Content Focus: "What level of detail should we include?" (select: ["Let agent decide", "High-level overview", "Moderate detail", "Comprehensive analysis", "Executive summary"])
+
+**For Technical Content:**
+- Slide Count: Factor in technical complexity, implementation steps, supporting tables
+- Questions: "What's the technical expertise of your audience?" (select: ["Let agent decide", "Beginner", "Intermediate", "Advanced", "Mixed levels"])
+- Content Depth: "How much technical detail should we include?" (select: ["Let agent decide", "High-level concepts", "Moderate technical depth", "Detailed implementation", "Reference-level detail"])
+
+**For Educational Content:**
+- Slide Count: Consider learning objectives, example complexity, supporting materials
+- Questions: "What's the primary learning objective?" (select: ["Let agent decide", "Awareness building", "Skill development", "Comprehensive training", "Quick reference"])
+- Supporting Content: "Should we include detailed examples?" (boolean: default true)
+
+**IMPORTANT**: ALWAYS include "Let agent decide" as the FIRST option in ALL select questions and set it as the default_value. This allows users to defer decisions to the AI when uncertain.
+
+Perform both slide estimation and question generation in a single comprehensive analysis!
+
+## CRITICAL: Output Format Requirements
+
+**MANDATORY**: Your response must be ONLY valid JSON. No markdown, no explanations, no text before or after the JSON.
+
+**FORBIDDEN**: Do not include:
+- Markdown formatting (###, **, etc.)
+- Code blocks (```)
+- Explanatory text before or after JSON
+- Comments in JSON (// are not valid JSON)
+
+**REQUIRED**: Return ONLY this JSON structure:
 {
     "estimated_slides": number,
     "content_complexity": "low|medium|high",
@@ -112,18 +156,20 @@ Return JSON with:
         "conclusion_slides": number,
         "total": number
     },
-    "complexity_factors": ["factor1", "factor2", ...],
+    "complexity_factors": ["factor1", "factor2"],
     "reasoning": "explanation of slide count decision and question selection",
-    "confidence": number_between_0_and_1,
+    "confidence": 0.8,
     "questions": [
         {
             "id": "unique_question_id",
             "question": "Clear question text with context",
-            "field_type": "select" | "boolean",
-            "options": ["Let agent decide", "option1", "option2", "option3"], // for select only - ALWAYS include "Let agent decide" as first option
+            "field_type": "select",
+            "options": ["Let agent decide", "option1", "option2", "option3"],
             "required": true,
-            "default_value": "Let agent decide" // for select questions, "default_option_or_boolean" for boolean
+            "default_value": "Let agent decide"
         }
     ],
     "content_analysis": "Brief analysis of content type and detected themes"
 }
+
+**VALIDATION**: Your JSON must parse successfully with JSON.parse(). Test it before responding.

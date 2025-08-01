@@ -39,9 +39,13 @@ class ClarificationQuestionGenerator extends BaseAgent {
         }
 
         // Load system prompt from centralized prompt management
-        const systemPrompt = promptLoader.loadPrompt('clarification_question_generator_system');
+        const systemPromptTemplate = promptLoader.loadPrompt('clarification_question_generator_system');
+        
+        // Extract only the system instructions (everything before User Prompt Template)
+        const systemPromptMatch = systemPromptTemplate.match(/([\s\S]*?)(?=## User Prompt Template:|$)/);
+        const systemPrompt = systemPromptMatch ? systemPromptMatch[1].trim() : systemPromptTemplate;
 
-        // Create user prompt with content analysis
+        // Create user prompt with content analysis using template
         const userPrompt = this.createCombinedUserPrompt({
             conversation_content,
             document_content,
@@ -55,7 +59,48 @@ class ClarificationQuestionGenerator extends BaseAgent {
 
         // Call AI service ONCE for both slide estimation and question generation
         const aiResponse = await this.callAI(messages);
-        const result = this.parseAIResponse(aiResponse.content);
+        
+        // Enhanced JSON parsing with validation for this specific agent
+        let result;
+        try {
+            result = this.parseAIResponse(aiResponse.content);
+            
+            // Validate required fields for ClarificationQuestionGenerator
+            if (!result.estimated_slides || !result.questions || !Array.isArray(result.questions)) {
+                throw new Error('Missing required fields: estimated_slides or questions array');
+            }
+            
+        } catch (error) {
+            console.error('[ClarificationQuestionGenerator] AI Response parsing failed:', error.message);
+            console.error('[ClarificationQuestionGenerator] Raw AI Response:', aiResponse.content.substring(0, 1000));
+            
+            // Create fallback response
+            result = {
+                estimated_slides: PRESENTATION_CONFIG.default_slides,
+                content_complexity: "medium",
+                slide_breakdown: {
+                    title_slide: 1,
+                    agenda_slides: 1,
+                    content_slides: PRESENTATION_CONFIG.default_slides - 3,
+                    conclusion_slides: 1,
+                    total: PRESENTATION_CONFIG.default_slides
+                },
+                complexity_factors: ["content_volume", "technical_complexity"],
+                reasoning: "Fallback estimation due to AI response parsing error",
+                confidence: 0.5,
+                questions: [
+                    {
+                        id: "audience_level",
+                        question: "What is the expertise level of your audience?",
+                        field_type: "select",
+                        options: ["Let agent decide", "Beginner", "Intermediate", "Advanced"],
+                        required: true,
+                        default_value: "Let agent decide"
+                    }
+                ],
+                content_analysis: "Unable to analyze due to parsing error - using default settings"
+            };
+        }
 
         // Ensure slide count is within bounds
         result.estimated_slides = Math.max(
@@ -81,48 +126,43 @@ class ClarificationQuestionGenerator extends BaseAgent {
 
 
     createCombinedUserPrompt({ conversation_content, document_content, conversation_history }) {
-        let contentSection = '';
+        // Load user prompt template from external file
+        const userPromptTemplate = promptLoader.loadPrompt('clarification_question_generator_system');
         
+        // Extract user prompt section from the system prompt file
+        const userPromptMatch = userPromptTemplate.match(/## User Prompt Template:\s*([\s\S]*?)(?=## Output Format:|$)/);
+        if (!userPromptMatch) {
+            throw new Error('User prompt template not found in clarification_question_generator_system.txt');
+        }
+        
+        let userPrompt = userPromptMatch[1].trim();
+        
+        // Prepare content section
+        let contentSection = '';
         if (conversation_content) {
             contentSection += `## Conversation Content:\n${conversation_content}\n\n`;
         }
-        
         if (document_content) {
             contentSection += `## Document Content:\n${document_content}\n\n`;
         }
         
-        return `Analyze this content and perform BOTH slide estimation AND question generation:
-
-${contentSection}## Context:
-- Content source: ${conversation_content ? 'Conversation history' : ''}${document_content ? 'Document content' : ''}${conversation_content && document_content ? ' and document content' : ''}
-- Task: Provide both optimal slide count and relevant clarification questions
-
-## Your Task:
-1. **Slide Estimation**: Analyze content complexity, volume, and structure to determine optimal slide count
-2. **Content Analysis**: Identify content type, themes, and complexity factors
-3. **Question Generation**: Generate 3-4 highly relevant questions (select/boolean only) based on the content analysis
-4. Ensure questions help customize the presentation for maximum value
-
-## Examples of Analysis:
-
-**For Business Content:**
-- Slide Count: Consider strategic depth, implementation details, stakeholder levels
-- Questions: "What's your primary audience role?" (select: ["Let agent decide", "C-level executives", "Middle management", "Department teams", "Mixed audience"])
-- Content Focus: "What level of detail should we include?" (select: ["Let agent decide", "High-level overview", "Moderate detail", "Comprehensive analysis", "Executive summary"])
-
-**For Technical Content:**
-- Slide Count: Factor in technical complexity, implementation steps, supporting tables
-- Questions: "What's the technical expertise of your audience?" (select: ["Let agent decide", "Beginner", "Intermediate", "Advanced", "Mixed levels"])
-- Content Depth: "How much technical detail should we include?" (select: ["Let agent decide", "High-level concepts", "Moderate technical depth", "Detailed implementation", "Reference-level detail"])
-
-**For Educational Content:**
-- Slide Count: Consider learning objectives, example complexity, supporting materials
-- Questions: "What's the primary learning objective?" (select: ["Let agent decide", "Awareness building", "Skill development", "Comprehensive training", "Quick reference"])
-- Supporting Content: "Should we include detailed examples?" (boolean: default true)
-
-**IMPORTANT**: ALWAYS include "Let agent decide" as the FIRST option in ALL select questions and set it as the default_value. This allows users to defer decisions to the AI when uncertain.
-
-Perform both slide estimation and question generation in a single comprehensive analysis!`;
+        // Prepare content source description
+        let contentSource = '';
+        if (conversation_content && document_content) {
+            contentSource = 'Conversation history and document content';
+        } else if (conversation_content) {
+            contentSource = 'Conversation history';
+        } else if (document_content) {
+            contentSource = 'Document content';
+        } else {
+            contentSource = 'No content provided';
+        }
+        
+        // Replace template variables
+        userPrompt = userPrompt.replace('{CONTENT_SECTION}', contentSection);
+        userPrompt = userPrompt.replace('{CONTENT_SOURCE}', contentSource);
+        
+        return userPrompt;
     }
 
     addSlideCountQuestion(generatedQuestions, aiRecommendedSlides, userSpecified = false) {

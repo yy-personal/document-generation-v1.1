@@ -65,12 +65,40 @@ class BaseAgent {
      */
     parseAIResponse(content) {
         try {
-            // Remove any markdown code blocks if present
-            const cleanContent = content.replace(/```json\n?|\n?```/g, '').trim();
-            return JSON.parse(cleanContent);
+            // Strategy 1: Direct parse
+            return JSON.parse(content);
         } catch (error) {
-            console.error(`[${this.agentName}] Failed to parse AI response as JSON:`, content);
-            throw new Error(`Invalid JSON response from ${this.agentName}: ${error.message}`);
+            // Strategy 2: Clean markdown and common formatting issues
+            try {
+                let cleanContent = content
+                    .replace(/```json\n?|\n?```/g, '')  // Remove code blocks
+                    .replace(/^[#*\-\s]*.*?\n/gm, '')   // Remove markdown headers/bullets
+                    .replace(/^\s*[\w\s]*:\s*$/gm, '')  // Remove section headers
+                    .trim();
+                
+                // Find JSON object boundaries
+                const jsonStart = cleanContent.indexOf('{');
+                const jsonEnd = cleanContent.lastIndexOf('}');
+                
+                if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+                    cleanContent = cleanContent.substring(jsonStart, jsonEnd + 1);
+                }
+                
+                return JSON.parse(cleanContent);
+            } catch (secondError) {
+                // Strategy 3: Extract JSON from mixed content
+                try {
+                    const jsonMatch = content.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        return JSON.parse(jsonMatch[0]);
+                    }
+                } catch (thirdError) {
+                    // Final fallback - log and throw
+                    console.error(`[${this.agentName}] All JSON parsing strategies failed:`);
+                    console.error('Original content:', content.substring(0, 500));
+                    throw new Error(`Invalid JSON response from ${this.agentName}: ${error.message}`);
+                }
+            }
         }
     }
 
